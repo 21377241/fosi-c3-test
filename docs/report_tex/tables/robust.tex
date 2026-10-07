@@ -1,0 +1,15 @@
+\begin{table}[htbp]\centering
+\caption{稳定性检验：FPS AI 在不同条件下的脚步与枪声增益（dB）}\label{tab:robust}
+{\small\begin{threeparttable}
+\begin{tabular}{lcccccc}\toprule
+检验条件 & \makecell{脚步\\n} & \makecell{脚步\\G 中位} & \makecell{枪声\\n} & \makecell{枪声\\G 中位} & \makecell{同电平 $\Delta$G\\{[}95\% CI{]}} & \makecell{可匹配\\枪声数} \\
+\midrule
+主分析（纯净 + 有持续背景） & 170 & $+$8.7 & 72 & $+$0.2 & $+$6.9 [$+$2.9, $+$8.0] & 42 \\
+仅纯净 & 72 & $+$9.1 & 62 & $+$0.1 & $+$6.2 [$+$3.3, $+$8.6] & 33 \\
+仅有持续背景 & 98 & $+$8.5 & 10 & $+$1.1 & $+$5.3 [$-$3.4, $+$7.9] & 9 \\
+VALORANT & 97 & $+$8.0 & 48 & $+$0.2 & $+$7.2 [$+$3.2, $+$7.9] & 29 \\
+PUBG & 73 & $+$11.8 & 24 & $+$0.1 & $+$10.2 [$-$1.0, $+$12.5] & 13 \\
+峰值口径（起点后 80 ms） & 170 & $+$9.1 & 72 & $+$0.2 & $+$7.9 [$+$3.8, $+$8.8] & 47 \\
+\bottomrule\end{tabular}
+\begin{tablenotes}\footnotesize\item 各条件的参照脚步均为同一子集的人工确认脚步，首行即表 \ref{tab:gap} 的主分析结果；CI 为按片段聚类自助法（1000 次）。\end{tablenotes}\end{threeparttable}}
+\end{table}

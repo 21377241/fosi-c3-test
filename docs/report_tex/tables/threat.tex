@@ -1,0 +1,17 @@
+\begin{table}[htbp]\centering
+\caption{潜在混杂、误差来源与控制手段}\label{tab:threat}
+{\small\begin{threeparttable}
+\begin{tabularx}{\linewidth}{LL}\toprule
+潜在混杂或误差 & 控制手段 \\
+\midrule
+枪声比脚步响，处理可能只是“对响声增强少” & 同电平比较（$\pm$3 dB，至少 3 个参照脚步） \\
+选择性来自固定频响（脚步与枪声频谱不同） & 匹配静态 EQ：按 FPS AI 的脚步平均频响设计固定滤波器 \\
+标注错误或标注模型误判 & 人工优先；盲审复核；标注噪声模拟；两套样本口径 \\
+标注模型利用电平，与同电平分析循环 & 模型输入先做音量归一化 \\
+重叠声音污染增益测量 & 纯净度三档分级，主分析排除“有重叠” \\
+同片段事件相关，置信区间偏窄 & 按片段聚类的自助法 \\
+增益窗口的选择 & 区间 RMS 与起点后 80 ms 峰值两种口径对照 \\
+三轨未对齐或 EQ 轨含额外处理 & 互相关对齐（0 样本偏移）；实测与理论 EQ 频响比对 \\
+\bottomrule\end{tabularx}
+\end{threeparttable}}
+\end{table}

@@ -1,0 +1,26 @@
+# 品牌方提供的原始三轨音频（不公开）
+fps_test/
+
+# 由原始音频派生的文件：嵌入缓存与模型权重、事件音频片段、草图
+analysis/cache/
+analysis/clean_events/**/*.wav
+analysis/labeling/snippets/
+analysis/figs/
+analysis/results/*.png
+analysis/results/*.html
+analysis/results/*.log
+
+# 宣传册与生成的报告（PDF / HTML）
+docs/*.pdf
+docs/*.html
+docs/report_tex/*.pdf
+
+# LaTeX 中间文件
+*.aux
+*.log
+*.out
+*.toc
+
+# Python
+__pycache__/
+*.pyc

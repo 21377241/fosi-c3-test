@@ -1,0 +1,14 @@
+\begin{table}[htbp]\centering
+\caption{三条录音轨的对比：各类声音相对原始轨的中位增益（dB）}\label{tab:b_gain}
+{\small\begin{threeparttable}
+\begin{tabular}{lccccc}\toprule
+声音类别 & 事件数 & 原始音量（中位） & FPS AI & 实际 EQ & 匹配 EQ（模拟） \\
+\midrule
+脚步 & 170 & $-$49 dBFS & $+$8.7 & $-$0.8 & $+$8.7 \\
+枪声 & 72 & $-$33 dBFS & $+$0.2 & $-$1.0 & $+$8.8 \\
+换弹 & 9 & $-$45 dBFS & $+$1.9 & $+$0.4 & $+$9.4 \\
+道具（烟雾弹/吃药/爆能器） & 6 & $-$40 dBFS & $+$9.6 & $-$1.3 & $+$8.8 \\
+背景段* & 23 & $-$59 dBFS & $+$0.5 & $-$1.2 & $+$8.6 \\
+\bottomrule\end{tabular}
+\begin{tablenotes}\footnotesize\item 正值表示被放大。“匹配 EQ”是按 FPS AI 对脚步的平均放大曲线做的固定 EQ，脚步增益与 FPS AI 相同。\item * 背景段为远离任何声音事件的片段，未经人工逐段核实。\end{tablenotes}\end{threeparttable}}
+\end{table}

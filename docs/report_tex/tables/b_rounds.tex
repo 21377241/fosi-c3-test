@@ -1,0 +1,14 @@
+\begin{table}[htbp]\centering
+\caption{四轮人工标注}\label{tab:b_rounds}
+{\small\begin{threeparttable}
+\begin{tabularx}{\linewidth}{lcLLcc}\toprule
+轮次 & 标注条数 & 挑哪些事件 & 目的 & 脚步 & 非脚步 \\
+\midrule
+第 1 轮 & 153 & 按片段和音量分层随机抽取 & 建立初始训练集；作为无偏的精度检验样本 & 114 & 32 \\
+第 2 轮 & 80 & 两个模型意见相反、或拿不准的事件 & 补充模型最容易错的边界样本 & 39 & 36 \\
+第 3 轮 & 60 & 拿不准的事件按音量分层 + 响亮的脚步 & 补齐“响亮脚步 / 微弱枪声”这类难例 & 36 & 21 \\
+第 4 轮 & 55 & 剩余拿不准的事件随机抽取 & 检验模型是否已到上限，决定停止 & 30 & 23 \\
+合计 & 348 &  &  & 219 & 112 \\
+\bottomrule\end{tabularx}
+\begin{tablenotes}\footnotesize\item 其余为“混合 / 不确定”，不进入分析。\end{tablenotes}\end{threeparttable}}
+\end{table}

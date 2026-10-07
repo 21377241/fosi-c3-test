@@ -1,0 +1,14 @@
+\begin{table}[htbp]\centering
+\caption{各类事件在三种处理下的中位增益（dB）}\label{tab:gain_cls}
+{\small\begin{threeparttable}
+\begin{tabular}{lccccc}\toprule
+类别 & n & 原始电平中位 & FPS AI & 实际 EQ & 匹配静态 EQ \\
+\midrule
+脚步 & 170 & $-$49 dBFS & $+$8.7 & $-$0.8 & $+$8.7 \\
+枪声 & 72 & $-$33 dBFS & $+$0.2 & $-$1.0 & $+$8.8 \\
+换弹 & 9 & $-$45 dBFS & $+$1.9 & $+$0.4 & $+$9.4 \\
+烟雾弹/吃药/爆能器 & 6 & $-$40 dBFS & $+$9.6 & $-$1.3 & $+$8.8 \\
+背景段* & 23 & $-$59 dBFS & $+$0.5 & $-$1.2 & $+$8.6 \\
+\bottomrule\end{tabular}
+\begin{tablenotes}\footnotesize\item * 背景段距任何事件 $\geq$ 0.3 s、长 $\geq$ 1 s，未经人工逐段核实。\end{tablenotes}\end{threeparttable}}
+\end{table}

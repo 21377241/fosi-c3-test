@@ -1,0 +1,14 @@
+\begin{table}[htbp]\centering
+\caption{探索性分析：不同检测器下的脚步检出率变化（百分点，方括号为 95\% CI）}\label{tab:detect}
+{\footnotesize\begin{threeparttable}
+\begin{tabular}{lcccc}\toprule
+检测器 & 原始 AUC & 原始检出率 & FPS AI $-$ 原始 & EQ $-$ 原始 \\
+\midrule
+PANNs 零样本，仅 Walk, footsteps & 0.81 & 59\% & $-$7.4 [$-$14.1, $-$1.2] & $-$0.9 [$-$6.2, $+$5.6] \\
+PANNs 零样本，六类中脚步占比 & 0.82 & 60\% & $-$1.8 [$-$8.7, $+$4.7] & $+$1.8 [$-$1.9, $+$6.7] \\
+PANNs 零样本，六类中判类别 & -- & 39\% & $-$4.1 [$-$13.8, $+$4.6] & $+$4.6 [$-$3.3, $+$12.7] \\
+PANNs 微调，留出 8 个片段 & 0.81 & 75\% & $+$3.5 [$-$4.0, $+$10.3] & $+$3.5 [$+$0.0, $+$11.9] \\
+PANNs 微调，5 折交叉验证 & 0.78 & 66\% & $-$1.4 [$-$7.2, $+$4.1] & $+$1.4 [$-$0.9, $+$3.9] \\
+\bottomrule\end{tabular}
+\end{threeparttable}}
+\end{table}

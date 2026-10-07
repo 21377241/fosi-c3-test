@@ -1,0 +1,14 @@
+\begin{table}[htbp]\centering
+\caption{标注模型效果：人工标注与双分支集成带来的提升（第 1 轮随机样本 147 条）}\label{tab:model_eff}
+{\small\begin{threeparttable}
+\begin{tabular}{lccc}\toprule
+方案 & 人工标注 & 监督参数 & AUC \\
+\midrule
+标注前：AudioSet 分类器 + 规则 & 不用 & 0 & 0.806 \\
+CLAP 文本提示（零样本） & 不用 & 0 & 0.785 \\
+AST 线性探针 & 用 & 131 & 0.840 \\
+CLAP 线性探针 & 用 & 79 & 0.817 \\
+\textbf{AST + CLAP 集成（最终模型）} & 用 & 210 & \textbf{0.891} \\
+\bottomrule\end{tabular}
+\begin{tablenotes}\footnotesize\item “用”人工标注的方案以 332 条明确人工标注训练，按片段分组 5 折交叉验证，被评估事件所在片段不参与训练。\item “监督参数”指逻辑回归的权重与偏置；AST/CLAP 主干冻结，StandardScaler 与 PCA 在每折训练数据上无监督拟合（不使用标签），不计入。\end{tablenotes}\end{threeparttable}}
+\end{table}

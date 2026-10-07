@@ -1,0 +1,223 @@
+<!doctype html><html><head><meta charset="utf-8"><title>第 4 轮标注（类别 + 纯净度）</title>
+<style>
+body{font-family:"Microsoft YaHei",sans-serif;margin:20px;background:#1e1e1e;color:#ddd}
+#card{max-width:780px}img{width:100%;display:block}
+#imgwrap{position:relative;border:1px solid #444}
+.ov{position:absolute;pointer-events:none}
+#ph{width:2px;background:#fff;box-shadow:0 0 3px #000;display:none}
+#endbox{border:2px dashed #ffd400;box-sizing:border-box}
+.tick{width:0;border-left:2px dotted #ff5a5a}
+button{font-size:15px;margin:3px;padding:7px 12px;cursor:pointer;border-radius:6px;border:1px solid #666;background:#333;color:#eee}
+button.mode.on{background:#2a5d8f;border-color:#6af}button.sel{background:#2d7d46;border-color:#4c4}
+.legend{color:#aaa;font-size:13px;line-height:1.6;margin:6px 0}
+.sw{display:inline-block;width:14px;height:10px;vertical-align:middle;margin-right:3px}
+.meta{color:#999;margin:6px 0}#bar{height:6px;background:#333;margin:10px 0}#fill{height:6px;background:#4c4;width:0}
+kbd{background:#444;padding:1px 5px;border-radius:3px}
+#step{font-size:17px;margin:8px 0;padding:8px;border-radius:6px;background:#2b2b2b}
+#reveal{display:none;margin:8px 0;padding:10px;border-radius:6px;background:#26323d;line-height:1.8}
+#reveal.conflict{background:#4a2b2b}
+</style></head><body>
+<h3>第 4 轮标注（类别 + 纯净度）</h3>
+<div>每个事件两步：① 判断类别 <kbd>F</kbd> 脚步 <kbd>Shift+F</kbd> 脚步+备注 <kbd>G</kbd> 枪声 <kbd>O</kbd> 其他 <kbd>M</kbd> 混合 <kbd>X</kbd> 不确定；
+② 判断纯净度 <kbd>P</kbd> 纯净 <kbd>B</kbd> 有持续背景 <kbd>L</kbd> 有重叠。两步都完成后自动跳到下一个；按类别键或 P/B/L 可随时修改。<br>
+播放：<kbd>1</kbd> 只听事件 <kbd>2</kbd> 突出事件 <kbd>3</kbd> 完整原声 <kbd>4</kbd> 起点到估计终点　<kbd>空格</kbd> 重播　<kbd>←</kbd>/<kbd>→</kbd> 上/下一个。进度自动保存在浏览器里。</div>
+<div class="legend" style="margin-top:6px">纯净度看<b style="color:#ffd400">黄色虚线框</b>（起点到估计终点）：
+<b>P 纯净</b> = 框内只有这一个声音，背景几乎听不到；<b>B 有持续背景</b> = 只有这一个瞬态，但能听到风/发动机/雨/音乐/环境噪声；
+<b>L 有重叠</b> = 框内还有别的瞬态（另一下脚步、枪声、换弹等都算）。<span style="color:#ff5a5a">红色点线</span> = 检测到的其他事件起点，供参考。</div>
+<div id="bar"><div id="fill"></div></div>
+<div id="card">
+<div class="meta" id="meta"></div>
+<div id="step"></div>
+<div id="imgwrap"><img id="img"><div id="endbox" class="ov"></div><div id="ticks"></div><div id="ph" class="ov"></div></div>
+<div class="legend">频谱图：横轴=时间，纵轴=频率，颜色=能量（亮=响）。青色竖线/区域 = 事件起点及 80 ms 测量窗口；浅灰 = 背景窗口；白色移动线 = 播放位置。</div>
+<div><button class="mode" data-m="evt">1 只听事件</button><button class="mode" data-m="foc">2 突出事件</button>
+<button class="mode" data-m="ctx">3 完整原声</button><button class="mode" data-m="span">4 起点→估计终点</button></div>
+<audio id="aud" controls style="width:100%"></audio>
+<div><button data-l="f">F 脚步</button><button id="fnote">Shift+F 脚步+备注</button><button data-l="g">G 枪声</button>
+<button data-l="o">O 其他</button><button data-l="m">M 混合</button><button data-l="x">X 不确定</button></div>
+<div><button data-p="p">P 纯净</button><button data-p="b">B 有持续背景</button><button data-p="l">L 有重叠</button></div>
+<div id="otherbox" style="display:none;margin:6px 4px">
+<span id="notetitle"></span><input id="note" list="notes" style="font-size:15px;width:320px;padding:4px">
+<datalist id="notes"></datalist><button id="noteok">确认</button><span style="color:#999">（可留空，Esc 取消）</span></div>
+<div id="reveal"></div>
+<div style="margin-top:12px"><button id="prev">← 上一个</button><button id="next">下一个 →</button>
+<button id="nextun">跳到下一个未完成</button><button id="exp">导出 human_labels_r4.csv</button></div>
+</div>
+<script>
+const ITEMS = [{"id": 82, "game": "pubg", "clip": 1, "t": 19.146, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.655, "capped": false, "near": [0.13, 0.365, 0.835, 1.07]}, {"id": 87, "game": "pubg", "clip": 1, "t": 20.746, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.72, "capped": false, "near": [0.09, 0.365, 0.86, 1.095, 1.33]}, {"id": 261, "game": "pubg", "clip": 5, "t": 3.591, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.695, "capped": true, "near": [0.095, 0.305, 0.39, 0.475, 0.695, 0.79, 0.875, 1.23, 1.33]}, {"id": 268, "game": "pubg", "clip": 5, "t": 4.731, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.7, "capped": true, "near": [0.09, 0.19, 0.51, 0.7, 0.855]}, {"id": 269, "game": "pubg", "clip": 5, "t": 4.831, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.68, "capped": false, "near": [0.09, 0.41, 0.5, 0.755]}, {"id": 272, "game": "pubg", "clip": 5, "t": 6.471, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.69, "capped": true, "near": [0.495, 0.69, 1.24, 1.365]}, {"id": 284, "game": "pubg", "clip": 6, "t": 1.821, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.835, "capped": false, "near": [0.08, 0.44, 0.88, 1.02, 1.31]}, {"id": 285, "game": "pubg", "clip": 6, "t": 2.101, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.74, "capped": true, "near": [0.16, 0.32, 0.74, 1.03]}, {"id": 313, "game": "pubg", "clip": 8, "t": 2.606, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.69, "capped": false, "near": [0.235, 0.96, 1.37]}, {"id": 422, "game": "pubg", "clip": 13, "t": 5.336, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.76, "capped": false, "near": [0.28]}, {"id": 423, "game": "pubg", "clip": 14, "t": 0.691, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.76, "capped": false, "near": [0.835, 0.93, 1.04, 1.18, 1.35]}, {"id": 425, "game": "pubg", "clip": 14, "t": 1.021, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.665, "capped": false, "near": [0.27, 0.505, 0.71, 0.85, 1.02, 1.28, 1.385]}, {"id": 445, "game": "pubg", "clip": 14, "t": 5.446, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.69, "capped": false, "near": [0.035, 0.21, 0.315, 0.855, 1.01, 1.1, 1.27, 1.385]}, {"id": 454, "game": "pubg", "clip": 14, "t": 7.446, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.68, "capped": false, "near": [0.145, 0.365, 0.71, 0.835, 0.945, 1.095, 1.215, 1.37]}, {"id": 491, "game": "pubg", "clip": 15, "t": 0.961, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.91, "capped": true, "near": [0.29, 0.91, 1.005, 1.145]}, {"id": 493, "game": "pubg", "clip": 15, "t": 1.366, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.74, "capped": true, "near": [0.195, 0.505, 0.74, 1.42]}, {"id": 509, "game": "pubg", "clip": 15, "t": 5.836, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.735, "capped": true, "near": [0.11, 0.285, 0.455, 0.735, 0.86, 1.005, 1.15, 1.31]}, {"id": 521, "game": "pubg", "clip": 15, "t": 8.341, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.74, "capped": false, "near": [0.045, 0.215, 0.895, 1.19, 1.295]}, {"id": 582, "game": "valorant", "clip": 1, "t": 12.131, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.67, "capped": false, "near": [0.26, 0.5, 0.82, 0.92, 1.17, 1.26, 1.48]}, {"id": 653, "game": "valorant", "clip": 1, "t": 27.751, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.65, "capped": false, "near": [0.3, 0.38, 0.91, 0.99]}, {"id": 690, "game": "valorant", "clip": 1, "t": 46.066, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.655, "capped": false, "near": [0.28, 0.365, 0.7, 0.91, 1.015, 1.265, 1.365]}, {"id": 750, "game": "valorant", "clip": 1, "t": 57.586, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.64, "capped": false, "near": [0.69, 0.91, 1.015, 1.23, 1.33]}, {"id": 990, "game": "valorant", "clip": 2, "t": 56.691, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.65, "capped": false, "near": [0.11, 0.2, 0.69, 0.965, 1.27, 1.375]}, {"id": 997, "game": "valorant", "clip": 2, "t": 58.026, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.7, "capped": true, "near": [0.04, 0.375, 0.46, 0.7, 0.92, 1.015, 1.26, 1.345]}, {"id": 1096, "game": "valorant", "clip": 2, "t": 78.656, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.715, "capped": false, "near": [0.4, 0.5]}, {"id": 1107, "game": "valorant", "clip": 2, "t": 82.596, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.705, "capped": true, "near": [0.705, 0.795, 0.945, 1.115]}, {"id": 1244, "game": "valorant", "clip": 3, "t": 1.171, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.75, "capped": true, "near": [0.03, 0.26, 0.35, 0.495, 0.75, 0.86, 0.98, 1.1, 1.2, 1.33]}, {"id": 1252, "game": "valorant", "clip": 3, "t": 3.101, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.93, "capped": true, "near": [0.42, 0.93, 1.02]}, {"id": 1263, "game": "valorant", "clip": 4, "t": 2.316, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.63, "capped": false, "near": [0.005, 0.11, 0.745, 0.94, 1.045, 1.155, 1.26, 1.355, 1.46]}, {"id": 1271, "game": "valorant", "clip": 4, "t": 3.336, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.69, "capped": false, "near": [0.025, 0.135, 0.24, 0.335, 0.44, 1.21]}, {"id": 1274, "game": "valorant", "clip": 4, "t": 4.476, "onset": 0.6, "dur": 0.7896, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.71, "capped": false, "near": [0.07, 0.495]}, {"id": 1293, "game": "valorant", "clip": 5, "t": 3.906, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.73, "capped": true, "near": [0.025, 0.29, 0.395, 0.73, 0.905, 0.985, 1.135, 1.295]}, {"id": 1298, "game": "valorant", "clip": 5, "t": 4.601, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 2.1, "capped": false, "near": [0.035, 0.21, 0.29, 0.44]}, {"id": 1303, "game": "valorant", "clip": 6, "t": 1.441, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.81, "capped": true, "near": [0.27, 0.36, 0.81, 0.925, 1.245, 1.325]}, {"id": 1315, "game": "valorant", "clip": 6, "t": 4.091, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.725, "capped": true, "near": [0.085, 0.46, 0.725, 0.805, 0.9, 1.175, 1.27, 1.475]}, {"id": 1330, "game": "valorant", "clip": 6, "t": 7.716, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.645, "capped": false, "near": [0.5, 0.855, 0.985, 1.17, 1.265]}, {"id": 1333, "game": "valorant", "clip": 6, "t": 8.286, "onset": 0.6, "dur": 1.2135, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.695, "capped": true, "near": [0.03, 0.285, 0.415, 0.695]}, {"id": 1346, "game": "valorant", "clip": 7, "t": 2.391, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.72, "capped": true, "near": [0.005, 0.27, 0.36, 0.515, 0.72, 0.91, 1.24, 1.335]}, {"id": 1368, "game": "valorant", "clip": 8, "t": 2.946, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.775, "capped": false, "near": [0.965, 1.045, 1.285, 1.45]}, {"id": 1369, "game": "valorant", "clip": 8, "t": 3.311, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.63, "capped": false, "near": [0.235, 0.68, 0.92, 1.085, 1.25, 1.335]}, {"id": 1370, "game": "valorant", "clip": 8, "t": 3.391, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.67, "capped": false, "near": [0.155, 0.52, 0.84, 1.005, 1.17, 1.255]}, {"id": 1379, "game": "valorant", "clip": 8, "t": 5.016, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.64, "capped": false, "near": [0.205, 0.31, 0.49, 1.28]}, {"id": 1393, "game": "valorant", "clip": 9, "t": 3.106, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.725, "capped": false, "near": [0.09, 0.865, 0.955, 1.145, 1.24, 1.335]}, {"id": 1479, "game": "valorant", "clip": 12, "t": 3.671, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.71, "capped": false, "near": [0.16, 0.245, 0.51, 0.835, 0.915, 1.005, 1.13, 1.25, 1.48]}, {"id": 1489, "game": "valorant", "clip": 12, "t": 5.181, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.795, "capped": false, "near": [0.06, 0.29, 0.41, 0.95, 1.035, 1.145, 1.265, 1.355]}, {"id": 1496, "game": "valorant", "clip": 12, "t": 6.276, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.685, "capped": false, "near": [0.05, 0.17, 0.26, 0.48, 0.85, 0.945, 1.14, 1.24, 1.445]}, {"id": 1521, "game": "valorant", "clip": 12, "t": 10.561, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 1.315, "capped": false, "near": [0.485]}, {"id": 1576, "game": "valorant", "clip": 14, "t": 2.046, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.72, "capped": true, "near": [0.1, 0.185, 0.28, 0.495, 0.72, 0.955, 1.06, 1.19, 1.295, 1.38]}, {"id": 1577, "game": "valorant", "clip": 14, "t": 2.166, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.78, "capped": false, "near": [0.065, 0.16, 0.375, 0.48, 0.835, 0.94, 1.07, 1.175, 1.26]}, {"id": 1593, "game": "valorant", "clip": 15, "t": 1.871, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.775, "capped": false, "near": [0.145, 0.245, 0.345, 0.425, 1.46]}, {"id": 1597, "game": "valorant", "clip": 15, "t": 3.176, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.74, "capped": true, "near": [0.155, 0.25, 0.505, 0.74, 0.91, 0.995]}, {"id": 1598, "game": "valorant", "clip": 15, "t": 3.316, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.77, "capped": true, "near": [0.015, 0.11, 0.365, 0.46, 0.77, 0.855]}, {"id": 1603, "game": "valorant", "clip": 15, "t": 5.701, "onset": 0.6, "dur": 1.1611, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.71, "capped": true, "near": [0.405, 0.5, 0.71, 0.815, 0.91, 1.01]}, {"id": 1615, "game": "valorant", "clip": 16, "t": 2.831, "onset": 0.6, "dur": 1.5, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.89, "capped": false, "near": [0.12, 0.23, 0.505, 0.955, 1.06, 1.265, 1.37]}, {"id": 1617, "game": "valorant", "clip": 16, "t": 3.291, "onset": 0.6, "dur": 1.1508, "evt0": 0.57, "x0": 0.0944, "x1": 0.8383, "y0": 0.2076, "y1": 0.93, "end": 0.675, "capped": false, "near": [0.045, 0.14, 0.495, 0.805, 0.91]}];
+const MODE = "label";
+const KEY = "fosi_r4_v2";
+const NAMES = {f:"脚步", g:"枪声", o:"其他", m:"混合", x:"不确定"};
+const PURE = {p:"纯净", b:"有持续背景", l:"有重叠"};
+const NOTE_UI = {f:["脚步的地面 / 背景：","如：水 / 草地 / 金属 / 背景发动机，回车确认"],
+                 o:["其他声音类型：","如：换弹 / 开门 / 技能 / 人声 / 落地，回车确认"],
+                 m:["混合了哪些声音：","如：脚步+枪声 / 脚步+换弹，回车确认"]};
+let rev = JSON.parse(localStorage.getItem(KEY) || "{}");
+let i = 0, noteCode = "o", advTimer = null, stopAt = null;
+let mode = localStorage.getItem("fosi_review_mode") || "foc";
+const $ = s => document.querySelector(s);
+const typing = () => document.activeElement === $("#note");
+const R = it => rev[it.id] || {};
+const save = () => localStorage.setItem(KEY, JSON.stringify(rev));
+const fmt = (c, n) => NAMES[c] + (n ? `（${n}）` : "");
+const stem = it => `snippets/e${String(it.id).padStart(4,"0")}`;
+const SUFFIX = {evt:"_evt", foc:"_foc", ctx:"", span:""};
+function stage(r){ return !r.c ? "label" : !r.pure ? "pure" : !r.final ? "conflict" : "done"; }
+const X = (it, t) => 100*(it.x0 + Math.min(Math.max(t,0),it.dur)/it.dur*(it.x1-it.x0));
+
+function play(m){
+  mode = m; localStorage.setItem("fosi_review_mode", m);
+  document.querySelectorAll("button.mode").forEach(b=>b.classList.toggle("on", b.dataset.m===m));
+  const it = ITEMS[i], a = $("#aud");
+  a.src = stem(it) + SUFFIX[m] + ".wav";
+  stopAt = null;
+  if (m === "span") {
+    a.onloadedmetadata = () => { a.currentTime = Math.max(0, it.onset - 0.03); stopAt = it.end + 0.05; a.play().catch(()=>{}); };
+  } else { a.onloadedmetadata = null; a.play().catch(()=>{}); }
+}
+document.querySelectorAll("button.mode").forEach(b=>b.onclick=()=>play(b.dataset.m));
+function tick(){
+  const it = ITEMS[i], a = $("#aud"), ph = $("#ph");
+  if (stopAt !== null && a.currentTime >= stopAt) a.pause();
+  if (it && !a.paused) {
+    const t = (mode==="evt" ? it.evt0 : 0) + a.currentTime;
+    ph.style.left = X(it, t) + "%"; ph.style.display = "block";
+  } else ph.style.display = "none";
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+function overlays(it){
+  const top = (100*(1-it.y1)) + "%", hgt = (100*(it.y1-it.y0)) + "%";
+  const eb = $("#endbox");
+  eb.style.left = X(it, it.onset) + "%"; eb.style.width = (X(it, it.end) - X(it, it.onset)) + "%";
+  eb.style.top = top; eb.style.height = hgt;
+  $("#ph").style.top = top; $("#ph").style.height = hgt;
+  $("#ticks").innerHTML = it.near.map(t => `<div class="ov tick" style="left:${X(it,t)}%;top:${top};height:${hgt}"></div>`).join("");
+}
+
+function revealHtml(it, r){
+  if (MODE === "label") return `本次标注：<b>${fmt(r.final, r.fnote)}</b>　｜　纯净度：<b>${PURE[r.pure]}</b>　（按类别键或 P/B/L 可修改）`;
+  const p = it.p, pf = p.ens >= 0.5;
+  const model = `模型（训练时没见过这条标注）：AST ${p.AST.toFixed(2)}　CLAP ${p.CLAP.toFixed(2)}　声学 ${p["声学特征"].toFixed(2)}　→ 集成 ${p.ens.toFixed(2)}（${pf ? "像脚步" : "像非脚步"}）`;
+  let s = `原标注：<b>${fmt(it.orig, it.orig_note)}</b>　｜　本次盲判：<b>${fmt(r.c, r.note)}</b>　｜　纯净度：<b>${PURE[r.pure]}</b><br>${model}`;
+  if (stage(r) === "conflict") s += `<br><b style="color:#ff9">两次判断不一致</b>：<kbd>Enter</kbd> 采用本次（${NAMES[r.c]}）　<kbd>Backspace</kbd> 恢复原标注（${NAMES[it.orig]}）　或按类别键重新判`;
+  else s += `<br>最终标签：<b>${fmt(r.final, r.fnote)}</b>` + (r.c === it.orig ? "（与原标注一致）" : "（已改判）");
+  return s;
+}
+
+function show(){
+  clearTimeout(advTimer);
+  const it = ITEMS[i], r = R(it), st = stage(r);
+  $("#meta").textContent = `${i+1}/${ITEMS.length}  事件 #${it.id}  ${it.game} test${it.clip}  t=${it.t.toFixed(2)}s  估计时长 ${Math.round((it.end-it.onset)*1000)} ms${it.capped ? "（截到下一个事件起点）" : ""}`;
+  $("#step").innerHTML = st === "label" ? (MODE === "label" ? "① 判断类别" : "① 判断类别（原标注已隐藏）") :
+                         st === "pure" ? `② 判断纯净度：本次判为 <b>${fmt(r.c, r.note)}</b>，按 P / B / L` :
+                         st === "conflict" ? "③ 与原标注不一致，请裁定" : "✓ 已完成";
+  $("#img").src = stem(it) + ".png";
+  $("#img").onload = () => overlays(it);
+  if ($("#img").complete) overlays(it);
+  document.querySelectorAll("button[data-l]").forEach(b=>b.classList.toggle("sel", b.dataset.l===r.c));
+  document.querySelectorAll("button[data-p]").forEach(b=>b.classList.toggle("sel", b.dataset.p===r.pure));
+  const rv = $("#reveal");
+  if (st === "conflict" || st === "done") { rv.style.display = "block"; rv.className = st === "conflict" ? "conflict" : ""; rv.innerHTML = revealHtml(it, r); }
+  else rv.style.display = "none";
+  $("#otherbox").style.display = "none";
+  const done = ITEMS.filter(x=>R(x).final).length;
+  const same = ITEMS.filter(x=>R(x).final && R(x).c===x.orig).length;
+  $("#fill").style.width = (100*done/ITEMS.length) + "%";
+  $("#meta").textContent += `　｜　已完成 ${done}/${ITEMS.length}` + (MODE === "review" ? `，盲判与原标注一致 ${same}/${done}` : "");
+  play(mode);
+}
+function go(j){ if (j>=0 && j<ITEMS.length){ i=j; show(); } }
+function compare(it, r){
+  if (MODE === "label" || r.c === it.orig) { r.final = r.c; r.fnote = r.note || it.orig_note || ""; }
+  else { delete r.final; delete r.fnote; }
+}
+function setLabel(code, note=""){
+  const it = ITEMS[i], r = rev[it.id] = R(it);
+  r.c = code; r.note = note.trim();
+  if (r.pure) compare(it, r);
+  save(); show();
+  if (stage(r) === "done") advTimer = setTimeout(()=>go(i+1), 900);
+}
+function setPure(k){
+  const it = ITEMS[i], r = R(it);
+  if (!r.c) { $("#step").innerHTML = "请先判断类别（F/G/O/M/X），再判纯净度"; return; }
+  const first = !r.pure;
+  r.pure = k; rev[it.id] = r;
+  if (first || !r.final) compare(it, r);
+  save(); show();
+  if (first && stage(r) === "done") advTimer = setTimeout(()=>go(i+1), 900);
+}
+function resolve(useNew){
+  const it = ITEMS[i], r = R(it);
+  if (stage(r) !== "conflict") return;
+  if (useNew) { r.final = r.c; r.fnote = r.note; } else { r.final = it.orig; r.fnote = it.orig_note; }
+  save(); go(i+1);
+}
+function refreshNotes(){
+  const s = new Set(Object.values(rev).filter(v=>v.c===noteCode).map(v=>v.note).filter(Boolean));
+  ITEMS.forEach(it=>{ if (it.orig===noteCode && it.orig_note) s.add(it.orig_note); });
+  $("#notes").innerHTML = [...s].map(n=>`<option value="${n.replace(/"/g,"&quot;")}">`).join("");
+}
+function askNote(code){
+  noteCode = code;
+  const r = R(ITEMS[i]);
+  $("#notetitle").textContent = NOTE_UI[code][0];
+  $("#note").placeholder = NOTE_UI[code][1];
+  refreshNotes();
+  $("#otherbox").style.display = "block";
+  $("#note").value = r.c===code ? (r.note||"") : "";
+  $("#note").focus();
+}
+function confirmNote(){ $("#note").blur(); setLabel(noteCode, $("#note").value); }
+document.querySelectorAll("button[data-l]").forEach(b=>b.onclick=()=>
+  (NOTE_UI[b.dataset.l] && b.dataset.l!=="f") ? askNote(b.dataset.l) : setLabel(b.dataset.l));
+document.querySelectorAll("button[data-p]").forEach(b=>b.onclick=()=>setPure(b.dataset.p));
+$("#fnote").onclick = ()=>askNote("f");
+$("#noteok").onclick = confirmNote;
+$("#note").addEventListener("keydown", e=>{
+  if (e.key==="Enter"){ e.preventDefault(); confirmNote(); }
+  else if (e.key==="Escape"){ $("#note").blur(); $("#otherbox").style.display="none"; }
+  e.stopPropagation();
+});
+$("#prev").onclick = ()=>go(i-1);
+$("#next").onclick = ()=>go(i+1);
+$("#nextun").onclick = ()=>{ const j = ITEMS.findIndex(it=>!R(it).final); if (j>=0) go(j); };
+$("#exp").onclick = ()=>{
+  const q = s => `"${(s||"").replace(/"/g,'""')}"`;
+  const dur = it => Math.round((it.end-it.onset)*1000);
+  let csv;
+  if (MODE === "label") {
+    csv = "event_id,game,clip_id,t,human_label,note,purity,est_dur_ms\n";
+    ITEMS.forEach(it=>{ const r = R(it); if (!r.final) return;
+      csv += [it.id, it.game, it.clip, it.t, r.final, q(r.fnote), r.pure, dur(it)].join(",") + "\n"; });
+  } else {
+    csv = "event_id,game,clip_id,t,orig_label,orig_note,blind_label,blind_note,purity,final_label,final_note,est_dur_ms\n";
+    ITEMS.forEach(it=>{ const r = R(it); if (!r.c) return;
+      csv += [it.id, it.game, it.clip, it.t, it.orig, q(it.orig_note), r.c, q(r.note), r.pure||"", r.final||"", q(r.fnote),
+              dur(it)].join(",") + "\n"; });
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\ufeff"+csv], {type:"text/csv;charset=utf-8"}));
+  a.download = "human_labels_r4.csv"; a.click();
+};
+document.addEventListener("keydown", e=>{
+  if (typing()) return;
+  const k = e.key.toLowerCase();
+  if (k==="f" && e.shiftKey){ e.preventDefault(); askNote("f"); }
+  else if (k==="o" || k==="m"){ e.preventDefault(); askNote(k); }
+  else if ("fgx".includes(k) && k.length===1) setLabel(k);
+  else if ("pbl".includes(k) && k.length===1) setPure(k);
+  else if (e.key==="Enter"){ e.preventDefault(); const r = R(ITEMS[i]); stage(r)==="conflict" ? resolve(true) : stage(r)==="done" && go(i+1); }
+  else if (e.key==="Backspace"){ e.preventDefault(); resolve(false); }
+  else if (k==="1") play("evt");
+  else if (k==="2") play("foc");
+  else if (k==="3") play("ctx");
+  else if (k==="4") play("span");
+  else if (e.key===" "){ e.preventDefault(); const a=$("#aud"); a.currentTime = mode==="span" ? Math.max(0, ITEMS[i].onset-0.03) : 0; a.play(); }
+  else if (e.key==="ArrowLeft") go(i-1);
+  else if (e.key==="ArrowRight") go(i+1);
+});
+show();
+</script></body></html>

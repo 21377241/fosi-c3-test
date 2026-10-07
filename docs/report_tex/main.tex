@@ -1,0 +1,409 @@
+\documentclass[11pt,a4paper]{ctexart}
+\usepackage[top=25mm,bottom=25mm,left=24mm,right=24mm]{geometry}
+\usepackage{graphicx,booktabs,threeparttable,makecell,multirow,tabularx,array,enumitem,amsmath,amssymb,xcolor,float,fancyhdr,lastpage}
+\usepackage[section]{placeins}
+\usepackage{etoolbox}
+\pretocmd{\subsection}{\FloatBarrier}{}{}
+\usepackage[font=small,labelfont=bf,labelsep=quad,skip=4pt]{caption}
+\usepackage[colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue]{hyperref}
+\setmainfont{Times New Roman}
+\setsansfont{Arial}
+\ctexset{section={format=\Large\heiti\raggedright},subsection={format=\large\heiti\raggedright},
+         subsubsection={format=\normalsize\heiti\raggedright}}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\renewcommand{\arraystretch}{1.18}
+\setlist{nosep,leftmargin=2em}
+\renewcommand{\topfraction}{0.9}\renewcommand{\bottomfraction}{0.8}\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.8}\setcounter{topnumber}{3}\setcounter{totalnumber}{5}
+\setlength{\emergencystretch}{2em}
+\pagestyle{fancy}\fancyhf{}
+\lhead{\small C3 FPS AI 声卡客观评测技术报告（详细版）}\rhead{\small 第 \thepage\ 页 / 共 \pageref{LastPage} 页}
+\renewcommand{\headrulewidth}{0.4pt}
+\newcommand{\figslot}[4]{%
+\begin{figure}[htbp]\centering
+\IfFileExists{figures/#1.pdf}{\includegraphics[width=#2]{figures/#1.pdf}}{%
+\IfFileExists{figures/#1.png}{\includegraphics[width=#2]{figures/#1.png}}{%
+\fbox{\parbox[c][4.2cm][c]{#2}{\centering\small\color{gray}图位：\texttt{\detokenize{#1}}\\[2pt]按《图表需求说明》制作后放入 figures 目录}}}}
+\caption{#3}\label{fig:#4}\end{figure}}
+\newcommand{\keybox}[1]{\par\noindent\fcolorbox{black!45}{black!4}{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule}{#1}}\par}
+
+\begin{document}
+\begin{titlepage}
+\centering\vspace*{35mm}
+{\Huge\heiti C3 FPS AI 声卡脚步增强功能\\[10pt] 客观评测技术报告\par}
+\vspace{8mm}
+{\Large 技术验证版（详细版）· Technical Report\par}
+\vspace{10mm}
+{\large 基于 VALORANT 与 PUBG 真实游戏录音的同源三轨实录、人机协同标注与混杂受控实验\par}
+\vspace{40mm}
+\begin{tabular}{rl}
+评测对象： & Fosi Audio C3 游戏声卡（FPS AI 模式）\\
+评测范围： & 脚步增强功能的声学效果（不含硬件指标、7.1、通话降噪）\\
+数据： & VALORANT 16 段、PUBG 15 段实录，共 7.7 min\\
+编制： & [编制部门 / 人员]\\
+版本： & v1.0\quad 2026 年 10 月\\
+\end{tabular}
+\vfill
+{\small 本报告为事实与口径母版，对外简版（Executive Report）中的数字与结论均以本报告为准。\\
+全部表格与数据由 \texttt{analysis/report\_tex.py} 从原始数据自动生成。\par}
+\end{titlepage}
+
+\tableofcontents
+\clearpage
+
+\section*{报告摘要}
+\addcontentsline{toc}{section}{报告摘要}
+本报告依据《C3 FPS AI 声卡客观评测方案》与 C3 宣传册，对 FPS AI 的脚步增强功能进行客观评测。评测使用本阶段计划评测的两款游戏 VALORANT（16 段）与 PUBG（15 段）的对局实录，
+每段同时录制原始、FPS AI、EQ 三个版本，共检测出 1620 个声音事件。由于缺少厂商标注，本报告设计了“人工主导、模型辅助”的四轮标注流程（348 条人工标注），
+对照分两层：\textbf{产品主对照}为 C3 自带的实际 EQ（产品预设），回答“直接开 C3 的 EQ 与开 FPS AI 有何区别”；
+\textbf{机制性辅助对照}为同电平比较与匹配静态 EQ，回答“观察到的选择性是否只是响度差异或固定频响造成的”。
+
+\keybox{\textbf{核心结论}：在本次 VALORANT 与 PUBG 真实游戏录音测试中，C3 实际 EQ 未增强脚步（中位 $-0.8$ dB），而 C3 FPS AI 对人工确认脚步的中位增强为 $+8.7$ dB，同时枪声中位变化仅 $+0.2$ dB。
+进一步将固定静态 EQ 调整至相同脚步增强水平后，枪声也会被提升约 $+8.8$ dB，表明 FPS AI 的选择性无法由固定静态频响解释。
+与此同时，少量与脚步特征相近的安静瞬态声仍可能被同步增强，本次非脚步事件中约 17\% 的增益超过 3 dB。
+
+\medskip\textbf{主要发现}
+\begin{enumerate}
+\item \textbf{产品主对比}：C3 实际 EQ 对脚步与枪声的中位增益分别为 $-0.8$ 与 $-1.0$ dB，FPS AI 为 $+8.7$ 与 $+0.2$ dB（表~\ref{tab:product}）。两种产品模式的作用逻辑完全不同：实际 EQ 不增强脚步，FPS AI 显著增强脚步而基本保持枪声。
+\item \textbf{事件选择性（H2，机制性检验）}：在控制原始电平后，枪声相较同电平脚步少增强 $6.9$ dB；采用与 FPS AI 相同脚步增益的匹配静态 EQ 时，该差异为 $-0.1$ dB，接近 0。
+观察到的选择性不能由固定静态频响解释，表现出明显的事件选择性处理特征。
+\item \textbf{脚步增强有效（H1）}：人工确认脚步的增益中位数为 $+8.7$ dB（95\% CI $+8.2$～$+10.2$ dB，$n=170$），94\% 不低于 3 dB；
+52\% 落在宣称的 3--9 dB，42\% 超过 9 dB，中位数位于宣传区间上沿。
+\item \textbf{非目标声音保持（H3）}：枪声中位增益 $+0.2$ dB，频谱变化（MSE $1.3$ dB$^2$）显著低于实际 EQ（$8.1$ dB$^2$）；含响亮声音的片段最大电平变化 $+0.1$ dB。
+但约 17\% 的非脚步瞬态（主要为远处安静枪声、换弹与道具声）被增强超过 3 dB。
+\item \textbf{稳定性（H4）}：选择性趋势在 VALORANT 与 PUBG 两款计划评测游戏中均被观察到，并在不同纯净度、增益口径及 20\% 标签噪声扰动下方向一致。
+\item \textbf{边界}：脚步附近背景同步抬高约 $+3.3$ dB；以脚步为主的安静场景整体响度随之上升；本报告只验证声学处理效果。
+\end{enumerate}
+综合判定：H1、H2、H4 \textbf{支持}，H3 \textbf{部分支持}；宣传册相关宣称的逐条核验见表~\ref{tab:claims}（支持 / 部分支持 / 未覆盖）。}
+
+\section{评测概述}
+\subsection{评测对象与产品宣称}
+C3 是 Fosi Audio Spider S 系列的游戏声卡，内置自研 FPS AI 模型。宣传册称其可“实时识别游戏声音，智能强化关键脚步声”，脚步声细节增强 3--9 dB，
+“不同于传统 EQ 调节，只强化必要频段，不干扰环境音或枪声”，并且“游戏整体音量未做改变”。模型针对 CS2、PUBG、三角洲行动分别训练（每款约 4000 小时、210 万～240 万条样本），
+本阶段计划评测游戏为 VALORANT 与 PUBG。本报告只评测脚步增强功能的声学效果，不涉及 DAC、7.1 空间音频与通话降噪等硬件功能，也不推断设备内部的实现机制。
+
+\subsection{评测目标与假设}
+将宣传册中与脚步增强相关的宣称归纳为四个可检验假设（表~\ref{tab:hyp}），其中 H2 事件选择性为核心假设；H1 以增益中位数的置信区间下限判定，增益与 3--9 dB 区间的关系仅作描述。“游戏整体音量未做改变”另以整段响度分析检验（\ref{sec:loud} 节）。判定标准在查看结果之前确定。
+各假设之前先给出产品层面的主对比（原始 vs 实际 EQ vs FPS AI，\ref{sec:product} 节）；匹配静态 EQ 只作为 H2 的机制性辅助对照（\ref{sec:ctrl} 节）。
+
+\input{tables/hyp}
+
+\subsection{评测流程}
+评测流程如图~\ref{fig:pipeline} 所示，遵循四项原则：同源配对（三种条件来自同一段音频）、事件级测量、主分析以人工标签为真值（模型仅用于扩展分析，精度独立核验）、混杂受控。
+
+\figslot{fig01_pipeline}{0.98\linewidth}{评测流程总览}{pipeline}
+
+\section{数据与评测条件}
+\subsection{数据}
+评测数据由品牌方提供：VALORANT 16 段、PUBG 15 段真实对局录音，每段均含三轨文件。本报告使用了提供的全部 31 段，未依据 FPS AI 的处理效果筛选或剔除任何片段；
+纳入前只检查与处理效果无关的条件，即三轨齐全、可正常解码、采样率一致且三轨可对齐，31 段均通过。
+片段如何从原始对局中截取（例如是否偏向含脚步的场景）、来自多少局对局以及录制设置，由品牌方掌握，本报告无法独立核实；结论适用于这批片段所代表的场景（见第~\ref{sec:limit} 节）。
+
+数据概况见表~\ref{tab:data}。录音为 48 kHz 立体声，每段有原始（AI 与 EQ 均关闭）、FPS AI（仅开 AI）、EQ（仅开 EQ，即产品预设，下称“实际 EQ”）三个版本。
+VALORANT 与 PUBG 均为本阶段计划评测游戏。
+
+\input{tables/data}
+
+\subsection{处理条件与同源性验证}
+EQ 条件为 10 段 RBJ 峰值滤波器级联（表~\ref{tab:eq}）。三轨经互相关对齐，偏移均为 0 样本。用原始轨与 EQ 轨的互谱估计实测频响，与理论频响在 50 Hz--16 kHz 内的最大偏差仅 0.03 dB（图~\ref{fig:eqresp}），
+证明 EQ 轨为纯静态滤波，同时验证了对齐与测量链路的精度。
+
+\input{tables/eq}
+\figslot{fig05_eq_response}{0.92\linewidth}{EQ 频响验证：实测（粗线）与按参数计算（虚线）}{eqresp}
+
+\section{标注流程}
+\subsection{候选事件生成}
+在原始轨上用频谱通量检测起点（STFT 窗长 1024、跳步 5 ms；60 Hz--16 kHz；阈值为 2 s 滑窗中位数加 3 倍中位绝对偏差；最小间隔 80 ms；峰值需比前方背景高 6 dB 以上），
+共得到 1620 个候选事件，FPS AI 与 EQ 轨使用相同时间点。事件终点取电平回落至背景 +3 dB 以内或比峰值低 20 dB 处，最长 1.5 s，且不超过下一事件起点。
+
+\subsection{标注规范}
+每个事件两步判断：\textbf{类别}为脚步（f）、枪声（g）、其他非脚步（o）、不确定（x），可附子类备注；\textbf{纯净度}为纯净（区间内只有该声音）、
+有持续背景（单一瞬态叠加平稳背景）、有重叠（区间内还有其他瞬态）。主分析只用前两档，保证增益测量对应单一声音。
+
+\subsection{标注工具}
+标注工具为浏览器端页面，每个事件显示前后共 1.5 s 的频谱图，叠加起点、估计终点框与邻近事件起点，提供只听事件、突出事件、完整原声、起点至终点四种播放方式，
+全部操作由键盘完成并自动保存。标注者只接触原始轨，看不到 FPS AI / EQ 版本和模型输出，保证盲法。
+\subsection{人机协同迭代}
+标注按“人工标注 $\rightarrow$ 训练模型 $\rightarrow$ 推断全部事件 $\rightarrow$ 选取下一轮样本”迭代四轮（表~\ref{tab:rounds}）。第 1 轮分层随机，兼作无偏核对样本；第 2 轮按主动学习的不确定性准则选样；
+第 3 轮定向补充响亮脚步与较弱枪声；第 4 轮对剩余不确定事件分层随机抽样，补充剩余难例。
+少量事件经人工复听或模型判断仍无法确定类别，这在实录游戏音频中属正常情况：人工标为“不确定”的 16 个与最终模型拿不准的 94 个（5.8\%），共 110 个（6.8\%）直接排除，不再追加标注。
+
+\input{tables/rounds}
+
+\subsection{质量控制}
+标注质量从以下四个方面核对，指标汇总见表~\ref{tab:quality}。
+
+\textbf{人工标注的一致性。}第 1 轮 153 条在隐藏原标注的条件下由标注者重新盲听判断，两次判断一致的占 94\%。
+Cohen $\kappa$ 衡量扣除随机一致之后的一致程度，一般认为 $\kappa>0.8$ 为几乎完全一致：四类（脚步 / 枪声 / 其他 / 不确定）$\kappa=0.86$，脚步与非脚步之间 $\kappa=0.96$。
+两次不一致的条目经复听裁定后作为最终标签，共改判 5 条。
+
+\textbf{标注模型的准确性。}模型精度只在第 1 轮分层随机样本上评估：第 2--4 轮是按模型不确定性挑出的难例，不代表全部事件，用它们评估会使精度估计产生偏差。
+留片段交叉验证的 AUC 为 0.891；按三区间判定时，判为脚步的 77 个中 96\% 正确，判为非脚步的 22 个中 82\% 正确。
+判为非脚步的准确率相对较低，但模型标签只用于扩展分析，主分析只使用人工确认事件。
+
+\textbf{无法确定的事件。}人工标为“不确定”的 16 个与最终模型拿不准的 94 个，共 110 个（6.8\%），不纳入任何分析。
+
+\textbf{标注误差对结论的影响。}标注噪声模拟（\ref{sec:robust} 节）显示，随机翻转 10\% 与 20\% 的人工标注后，核心选择性效应仍为 $+2.2$ 与 $+1.4$ dB；
+需刻意挑错 68 条（20\%）才能抹平效应，远超盲审反映的不一致水平（6\%）。因此，现有标注误差不足以改变本报告的结论。
+
+\input{tables/quality}
+
+\section{标注模型}
+\subsection{设计约束}
+\begin{itemize}
+\item \textbf{少样本}：人工标注仅数百条，监督学习部分的参数必须很少；
+\item \textbf{领域偏移}：AudioSet 预训练模型对游戏脚步的零样本识别不可用；
+\item \textbf{电平不变}：后续要在同电平条件下比较脚步与非脚步，模型若利用响度会与分析形成循环，因此输入先做音量归一化；
+\item \textbf{片段相关}：交叉验证一律按片段分组。
+\end{itemize}
+
+\subsection{模型结构}
+模型结构如图~\ref{fig:model}。AST 与 CLAP（HTSAT）编码器全部冻结：AST 输入起点前 0.3 s 至后 0.7 s 的 16 kHz 片段，取最后一层 144 个图块的均值（768 维）；
+CLAP 分别处理短窗（$-0.05$～$0.35$ s）与长窗（$\pm0.5$ s），拼接为 1024 维。每个分支经标准化、PCA（保留 95\% 方差，得 130 / 78 维）与 L2 正则逻辑回归（$C=0.05$，类别平衡），
+两分支概率取平均。监督分类器仅包含 210 个可训练参数（两个逻辑回归的权重与偏置，130 + 1 与 78 + 1）；AST/CLAP 主干全部冻结，StandardScaler 与 PCA 仅进行无监督拟合（在每折训练数据上拟合，不使用标签）。输出按三区间判定：$p\geq0.8$ 为脚步，$p\leq0.2$ 为非脚步，其余为不确定；人工标注一律优先。
+
+\figslot{fig04_model}{0.98\linewidth}{标注模型结构}{model}
+
+\subsection{模型效果}
+表~\ref{tab:model_eff} 以第 1 轮随机样本的人工判断为准，比较各方案的区分能力。不使用人工标注时，现成的 AudioSet 分类器加规则与 CLAP 文本提示的 AUC 仅 0.806 与 0.785；
+用人工标注训练线性探针后，AST 与 CLAP 单分支分别提高到 0.840 与 0.817；两分支误差部分互补，集成后进一步提高到 0.891。
+按三区间判定时，最终模型判为脚步的 77 个中 96\% 正确，判为非脚步的 22 个中 82\% 正确。主分析只使用人工确认事件，模型判定仅用于扩展分析，其误差影响由标注噪声模拟评估（\ref{sec:robust} 节）。
+
+\input{tables/model_eff}
+
+\subsection{标注前后的判别情况}
+标注前后全部事件的判别情况见表~\ref{tab:label_ba} 与图~\ref{fig:labacc}。标注完成后，348 个事件由人工直接确定，其余由最终模型判定，仅 110 个（6.8\%）因拿不准而排除。
+与标注前的自动标签相比，有明确标签的事件比例由 38\% 提高到 93\%，给出判断时的正确率由 64\% 提高到 93\%。
+
+\input{tables/label_ba}
+\figslot{figb_label_accuracy}{\linewidth}{标注前后的判别情况：(a) 全部事件的判别结果（标注后人工标注优先，其余由最终模型判定）；(b) 给出判断时的正确率与 AUC}{labacc}
+
+\section{实验设计}
+\subsection{核心指标定义}\label{sec:metrics}
+本节集中给出全文使用的评价指标，后文各节只引用、不再重复定义。所有指标都在三条同源轨的同一时间区间上计算：区间为事件起点前 20 ms 至估计终点后 50 ms。
+
+\textbf{基础量。}信号片段 $x$ 的均方根幅值与对数幅度谱定义为
+\begin{equation}
+\mathrm{RMS}(x)=\sqrt{\frac{1}{N}\sum_{n=1}^{N}x_n^2},\label{eq:rms}
+\end{equation}
+\begin{equation}
+S(t,f)=20\log_{10}\bigl(\lvert\mathrm{STFT}(x)\rvert(t,f)+\epsilon\bigr).\label{eq:spec}
+\end{equation}
+其中 $x_n$ 为区间内的全部采样值（双声道一并计入）；STFT 帧长 1024 点、帧移 256 点，只保留 50 Hz--16 kHz；$\epsilon$ 取原始轨谱峰值以下 80 dB，避免静音时频点的对数发散。
+在此基础上定义 5 个核心指标（表~\ref{tab:metrics}）。
+
+\begin{table}[htbp]\centering\small
+\caption{核心指标定义}\label{tab:metrics}
+\renewcommand{\arraystretch}{1.5}
+\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{2.3cm}>{\centering\arraybackslash}p{6.4cm}X}
+\toprule
+指标 & 公式 & 含义与判读 \\
+\midrule
+事件增益 $G$ & $\displaystyle G=20\log_{10}\frac{\mathrm{RMS}_{\mathrm{proc}}}{\mathrm{RMS}_{\mathrm{raw}}}$ &
+单个事件被增强多少（dB）；$G>0$ 为增强，$G\approx 0$ 为基本不变，$+6$ dB 约为波形幅值翻倍 \\
+选择性指数 SEI & $\displaystyle \mathrm{SEI}=\tilde G_{\text{脚步}}-\frac{1}{3}\sum_{c}\tilde G_{c}$ &
+脚步相对非目标声音的差异化增强，越大越有选择性；汇总描述指标 \\
+同电平增益差 $\Delta G_k$ & $\displaystyle \Delta G_k=\operatorname*{median}_{j:\,|L_j-L_k|\le 3\,\mathrm{dB}} G_j-G_k$ &
+非目标事件 $k$ 比原始电平相近的脚步少增强多少，排除原始响度差异；H2 主指标 \\
+频谱 MSE & $\displaystyle \mathrm{MSE}=\frac{1}{TF}\sum_{t,f}\bigl[S_{\mathrm{proc}}(t,f)-S_{\mathrm{raw}}(t,f)\bigr]^2$ &
+频谱结构变化（dB$^2$），越小越接近原声；分“总”与“形状”两种口径 \\
+误增强率 FER & $\displaystyle \mathrm{FER}=\frac{N\bigl(G_{\text{非脚步}}>3\,\mathrm{dB}\bigr)}{N_{\text{非脚步}}}$ &
+非脚步事件被误增强的比例；阈值即宣称的最低脚步增益 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+符号与口径说明：
+\begin{itemize}
+\item $\mathrm{proc}$ 指 FPS AI、实际 EQ 或匹配静态 EQ 处理轨，$\mathrm{raw}$ 指原始轨；$\tilde G$ 为某类事件增益的中位数。
+\item SEI 中 $c$ 取三类非目标声音（枪声、换弹、道具）。SEI 只作汇总描述；选择性的主要验证以同电平增益差和匹配静态 EQ 对照为准。
+\item $\Delta G_k$ 中 $j$ 为参照脚步，$L$ 为原始轨事件电平（dBFS）；参照脚步不足 3 个的事件 $k$ 不计入，报告值为所有 $k$ 的中位数。
+\item 频谱 MSE 的“总”口径即上式；“形状”口径先减去 $S_{\mathrm{proc}}-S_{\mathrm{raw}}$ 在全部时频点上的均值（即扣除整体电平变化）再计算，等于该差值的方差。
+\item FER 另取 23 段远离事件的背景段作环境负样本，按同一阈值计算。
+\item 辅助指标“声学突出度”：峰值增益减去前方背景（起点前 0.6--0.05 s 的 20\% 分位电平）的增益。
+\end{itemize}
+
+\subsection{对照条件}\label{sec:ctrl}
+对照分为两层（表~\ref{tab:ctrl}）。
+
+\begin{table}[htbp]\centering\small
+\caption{两层对照设计}\label{tab:ctrl}
+\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{2.6cm}>{\raggedright\arraybackslash}p{3.6cm}XX}
+\toprule
+层级 & 比较 & 回答的问题 & 性质 \\
+\midrule
+产品主对照 & 原始 vs 实际 EQ vs FPS AI & 直接开 C3 的 EQ 与开 FPS AI，表现有何区别？ & 两种均为用户实际可用的产品模式 \\
+机制性辅助对照 & FPS AI vs 匹配静态 EQ；同电平比较 & 观察到的选择性是否只是固定频响或原始响度差异造成的？ & 为分析额外构造，并非 C3 自带模式 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{产品主对照：实际 EQ。}即 C3 自带的 EQ 预设（2.2 节），与 FPS AI 同为用户实际可选的模式，是回答产品层面问题的主对照。
+
+\textbf{机制性辅助对照：匹配静态 EQ。}实际 EQ 对脚步几乎没有增益，无法满足评测方案“先将 EQ 调到与 AI 脚步增益相近”的要求，因此无法回答“固定 EQ 调得更激进能否复制 FPS AI 的效果”。
+为此构造匹配静态 EQ：以 FPS AI 在人工确认脚步上的平均频响（图~\ref{fig:resp}，1/3 倍频程平滑）设计 2049 阶线性相位 FIR 滤波器，并平移使其脚步增益中位数与 FPS AI 相同，
+作为对“固定频响解释”的强对照；它由同一批脚步拟合，对 EQ 一方偏有利，使检验更保守。匹配静态 EQ 只用于排除“固定频响即可解释结果”，不作为 FPS AI 的产品竞争对照。
+
+\figslot{fig08_fps_response}{0.82\linewidth}{FPS AI 在脚步上的平均频响（即匹配静态 EQ 的设计曲线）}{resp}
+
+\subsection{混杂控制与统计}\label{sec:design}
+可能导致误判的因素及控制手段见表~\ref{tab:threat}。主分析只使用人工确认、纯净度为前两档的事件，同电平比较的参照脚步也只用人工确认脚步；扩展分析加入模型高置信度事件。置信区间一律采用按片段聚类的自助法。
+
+\input{tables/threat}
+
+\section{实验结果}
+\subsection{样本}
+\input{tables/sample}
+
+\subsection{产品主对比：原始 vs 实际 EQ vs FPS AI}\label{sec:product}
+本节回答产品层面的问题：用户直接开启 C3 的实际 EQ 与开启 FPS AI，表现有何区别（表~\ref{tab:product}，表~\ref{tab:gain_cls}，图~\ref{fig:bars}）。
+实际 EQ 对脚步的中位增益为 $-0.8$ dB，对枪声为 $-1.0$ dB，即基本不增强任何类别；FPS AI 对脚步为 $+8.7$ dB，对枪声仅 $+0.2$ dB。
+两种产品模式的作用逻辑完全不同：实际 EQ 是作用于全部声音的固定频响调整，FPS AI 则主要增强脚步。
+在非目标声音上，FPS AI 的误增强率（17\%）与实际 EQ（15\%）相近，枪声频谱变化则小于实际 EQ（\ref{sec:h3} 节）。
+
+\input{tables/product}
+\input{tables/gain_cls}
+\figslot{fig07_gain_by_class}{0.95\linewidth}{各类事件在三种处理下的中位增益（误差线为四分位距；匹配静态 EQ 为机制性辅助对照）}{bars}
+
+\subsection{H1 脚步增强有效性}
+FPS AI 对人工确认脚步的增益中位数为 $+8.7$ dB，95\% CI 下限 $+8.2$ dB 高于 3 dB（表~\ref{tab:gain_a}），增强效果明确成立。
+从分布看，52\% 的脚步落在宣称的 3--9 dB，42\% 超过 9 dB，6\% 低于 3 dB；实测中位数位于宣传区间上沿，但较多事件的增益高于 9 dB，因此不表述为“3--9 dB 宣称完全成立”。
+实际 EQ 对脚步为 $-0.8$ dB：脚步约 62\%（VALORANT）与 59\%（PUBG）的能量在 300 Hz 以下，正好落在两套 EQ 削减的频段。
+$-35$ dBFS 以上的脚步仅 25 个、来自 7 个片段，增益主要由片段决定（PUBG test4、VALORANT test7、VALORANT test8 为 1.6--5.3 dB，其余片段中位 6.4--12.3 dB），样本不足以下结论。
+
+\input{tables/gain_a}
+\figslot{fig06_gain_vs_level}{0.98\linewidth}{各事件增益与原始电平（左：FPS AI；右：实际 EQ）}{level}
+
+\subsection{H2 事件选择性：机制性检验（核心发现）}
+产品主对比显示 FPS AI 增强脚步而基本不增强枪声（$+0.2$ dB）。本节用两项机制性辅助对照检验这一差异能否由原始响度差异或固定频响解释。同电平比较（表~\ref{tab:gap}）显示枪声比脚步少增强 $6.9$ dB、换弹少增强 $6.6$ dB，
+显著削弱了“只是对响声增强少”这一简单解释（$\pm$3 dB 匹配可控制一阶响度影响，但不能排除所有与电平相关的非线性行为）；匹配静态 EQ 的同电平差仅 $-0.1$ dB，即脚步增益相同的固定 EQ 会同步抬高枪声（$+8.8$ dB），因此观察到的选择性无法由固定静态频响解释。
+脚步 $+8.7$、枪声 $+0.2$、同电平差 $6.9$、匹配静态 EQ $-0.1$ dB 相互印证，是本报告技术层面最核心的发现。
+作为汇总描述，SEI 为 $+4.8$ dB，实际 EQ 与匹配静态 EQ 分别为 $-0.2$ 与 $-0.3$ dB。
+例外是烟雾弹、吃药声与爆能器一类（$-3.5$ dB，仅 5 个可匹配），受到的增强不低于同电平脚步。
+
+图~\ref{fig:wave} 与图~\ref{fig:spec} 以一个典型脚步与一个响亮枪声为例对比四种处理。
+波形上，FPS AI 将脚步放大 $+9.1$ dB，枪声基本不变（$+0.1$ dB）；匹配静态 EQ 对脚步的增益相近（$+8.7$ dB），却同时把枪声抬高 $+9.1$ dB；实际 EQ 对两者均略有衰减。
+差分声谱（处理后减原始，红色为增强、蓝色为衰减）更直观：实际 EQ 在两类事件上呈现同一条固定的频带图案，匹配静态 EQ 在两类事件上整体变红，而 FPS AI 只在脚步上变红、在枪声上几乎无变化。
+FPS AI 对脚步的增强集中在起振段与 2 kHz 以下，后段高频略有衰减，与固定频响的“全时段同一图案”明显不同。
+
+\input{tables/gap}
+\figslot{figb_waveforms_full}{\linewidth}{典型事件在四种处理下的波形，同一行纵轴刻度相同（上：脚步 \#1340；下：枪声 \#1456；标签为相对原始轨的增益与波形幅值倍数；匹配静态 EQ 为机制性辅助对照）}{wave}
+\figslot{fig12_spectrograms}{\linewidth}{典型事件的原始声谱与差分声谱（上：脚步 \#1340；下：枪声 \#1456）。差分声谱为处理后减原始，红色为增强、蓝色为衰减，灰色为原始能量低于峰值 60 dB 的区域；标签为事件增益}{spec}
+
+\subsection{H3 非目标声音保持性}\label{sec:h3}
+本节检验 FPS AI 能否在增强脚步的同时较好保持主要非目标声音。枪声的频谱总变化（MSE）为 $1.3$ dB$^2$，约为实际 EQ（$8.1$ dB$^2$）的 15\%（约 1/6）；
+扣除整体电平差后，枪声的频谱形状变化为 $1.1$ dB$^2$，也显著小于实际 EQ（$4.5$ dB$^2$，约 1/4）（表~\ref{tab:mse}）。
+非脚步 FER 为 17\%，枪声为 10\%（表~\ref{tab:fer}，图~\ref{fig:fer}），高于 10\% 的判定线。该线是本报告设定的工程容忍阈值（约每 10 个非脚步事件允许 1 个被明显增强），并非行业标准；H3 判为部分支持主要源于这一点。
+被误增强的事件电平低、与脚步相近：7 个被增强的枪声位于 $-57$～$-36$ dBFS，均为远处枪声，近处响亮枪声无一被增强；且集中在少数片段（附录表~\ref{tab:boosted}）。
+FPS AI 对脚步本身的频谱形状改变（$12.4$ dB$^2$）高于实际 EQ（$5.7$ dB$^2$），这符合其主动增强目标，但是否影响材质、距离等感知需要主观实验。
+结论为\textbf{部分支持}：对响亮枪声保持较好，但对部分安静瞬态、换弹和道具声存在误增强。
+
+\input{tables/mse}
+\input{tables/fer}
+\figslot{fig09_fer_curve}{0.95\linewidth}{误增强率随判定阈值的变化（点线为本报告阈值 3 dB；匹配静态 EQ 为机制性辅助对照）}{fer}
+
+\subsection{H4 稳定性}\label{sec:robust}
+H4 检验在不同目标游戏、事件纯净度、增益计算口径及合理标签噪声扰动下，核心选择性效应的方向是否稳定。
+在上述条件下，同电平 $\Delta G$ 的点估计均为正（$+$5.3～$+$10.2 dB，表~\ref{tab:robust}，图~\ref{fig:forest}），效应方向不变；
+其中仅有持续背景（可匹配枪声 9 个）、PUBG（可匹配枪声 13 个）因可匹配枪声过少，CI 跨 0，单独不足以下结论。标注噪声模拟中（332 条明确标注），选择性效应为 $+3.8$ dB，
+随机翻转 10\% 与 20\% 标注后分别为 $+2.2$ 与 $+1.4$ dB；需刻意挑错 68 条（20\%）才能抹平效应，远超盲审反映的不一致水平（6\%）。
+两款目标游戏的增强幅度不同（脚步：PUBG $+11.8$ dB，VALORANT $+8.0$ dB），但都呈现脚步明显增强、枪声中位变化较小（$+0.1$ / $+0.2$ dB）的模式（表~\ref{tab:game}）。
+两款游戏的一致结果不构成对其他游戏的泛化结论。
+
+\input{tables/robust}
+\figslot{fig10_robustness_forest}{0.95\linewidth}{稳定性检验：各条件下枪声的同电平增益差及 95\% CI（菱形为主分析；空心点表示 CI 跨过 0。H4 只看效应方向是否保持为正，黑色实线 0 dB 为其参考线；灰色虚线为 H2 的 3 dB 效果参考线，不作为各子集的判定标准）}{forest}
+\input{tables/game}
+
+\subsection{整体响度}\label{sec:loud}
+针对“游戏整体音量未做改变”，对每段计算整段 RMS 与 50 ms 短时电平的中位数、99\% 分位数和最大值（表~\ref{tab:loud}，图~\ref{fig:loud}）。在含响亮声音的 16 个片段中，
+最大电平变化中位 $+0.1$ dB，最响的声音未被放大，未观察到统一的全局正增益（但中位电平 $L_{50}$ 仍抬高 $+3.9$ dB，反映片段内较弱声音被增强）；在以脚步为主的 15 个安静片段中，最大电平随脚步抬高 $+10.9$ dB，
+但处理后至多 $-18$ dBFS，仍低于响亮片段的原始最大电平（$-8$ dBFS）。
+
+\input{tables/loud}
+\figslot{fig11_loudness}{0.8\linewidth}{各片段原始最大短时电平与处理后的变化（虚线为分界）}{loud}
+
+\subsection{其他观察}
+\begin{itemize}
+\item \textbf{即时性}：61 个至少 4 步的脚步串中，第一步增益 $+9.0$ dB，第 2--4 步 $+8.8$ dB，逐串差值 $+0.1$ dB，未观察到多步预热现象（事件级测量不能排除毫秒级的启动过程）。
+\item \textbf{突出度}：217 个人工确认脚步的峰值抬高 $+8.9$ dB，前方背景抬高 $+3.3$ dB，突出度净增 $+5.0$ dB（95\% CI $+4.2$～$+6.4$）；非脚步 $-0.4$ dB，实际 EQ 对脚步 $-0.5$ dB。
+\item \textbf{动态性}：FPS AI 的频带增益随时间变化（标准差中位 3.26 dB），实际 EQ 几乎不变（0.31 dB）。
+\item \textbf{底噪}：背景段增益中位 $+0.5$ dB，但 30\% 的背景段超过 3 dB，纯净脚步前紧邻背景抬高 $+4.1$ dB。
+\end{itemize}
+
+\section{宣称核验与适用边界}
+\subsection{假设判定}
+\input{tables/verdict}
+在产品层面，C3 实际 EQ 对脚步与枪声分别为 $-0.8$ / $-1.0$ dB，FPS AI 为 $+8.7$ / $+0.2$ dB：用户可用的两种模式中，只有 FPS AI 显著增强脚步。
+在技术层面，核心发现为 H2 事件选择性。最具区分力的证据是匹配静态 EQ 对照：当固定静态 EQ 对脚步取得与 FPS AI 相同的增益时，枪声与背景段也被同步抬高（$+8.8$ / $+8.6$ dB），
+而 FPS AI 对枪声的中位增益为 $+0.2$ dB。观察到的选择性无法由固定静态频响解释，表现出明显的事件选择性处理特征；本实验从输出行为描述这一差异，不直接推断设备内部的识别机制。
+H1 中脚步增强效果明确，但增益分布与 3--9 dB 区间仅部分重合（描述性结果，不影响判定）。H3 为部分支持，其边界见 \ref{sec:bound} 节。
+
+\subsection{宣传册宣称逐条核验}
+\input{tables/claims}
+宣传册称模型“精准提取脚步声频段”。实测 FPS AI 在脚步上的平均频响近似全频段抬升（图~\ref{fig:resp}），与按频段调节的 EQ 不同，表现为事件级的增强；
+这一描述基于输出行为，不代表对设备内部实现的推断。
+
+\subsection{适用边界}\label{sec:bound}
+\begin{enumerate}
+\item 误增强集中在电平与脚步相近的安静瞬态（远处枪声、换弹、烟雾弹、吃药声）；
+\item 增强脚步时紧邻背景同步抬高约 $+3.3$ dB，有效突出度（$+5.0$ dB）小于峰值增益（$+8.9$ dB）；
+\item 脚步音色被改变，是否影响材质与距离判断需主观实验确认；
+\item 安静场景整体响度随脚步上升（Lmax 中位 $+10.9$ dB）；
+\item $-30$ dBFS 以上的近距离响亮脚步缺乏样本；
+\item 结论限于 VALORANT 与 PUBG 两款目标游戏，且只验证声学处理效果，不等价于证明玩家定位能力提升。
+\end{enumerate}
+
+\section{局限与后续工作}\label{sec:limit}
+\begin{itemize}
+\item 数据由品牌方提供，片段的截取规则、对局数量与录制设置无法独立核实；若截取时偏向特定场景，结论只代表这类场景；
+\item 候选事件由原始轨频谱通量自动检测，缺少逐帧完整真值，因此候选检测的召回率无法直接评估，部分极弱、起振不明显或被背景掩盖的事件可能未进入后续分析。
+三轨使用相同的候选时间点，这不影响三种处理之间的比较，但限制了结果对“全部游戏脚步”的代表性；
+\item 数据来自真实对局且无分轨；人工确认的非脚步事件仅 87 个，PUBG 枪声仅 24 个，缺少爆炸、装拆包、技能声等类别；
+\item 仅一名标注者，盲审证明的是稳定性而非绝对准确性；事件终点为自动估计；
+\item 宣传册中的处理延迟（40 ms）无法用离线录音检验；
+\item 本报告只评价声学效果，增强能否提升玩家的脚步检测与定位表现需主观听辨实验验证。
+\end{itemize}
+后续建议：在训练场受控录制分类别、分距离素材以获得天然真值并补齐响亮脚步与爆炸声；引入第二名标注者；开展双盲主观听辨实验。
+
+\appendix
+\section{误增强事件清单}
+\input{tables/boosted}
+
+\section{机器可识别性的探索性分析}
+\textbf{鉴于候选检测器在原始游戏音频上的识别能力不足，本报告不使用机器可检测性作为 FPS AI 效果证据。}本附录作为负结果保留，供方法审查参考。
+
+使用未参与标注的 PANNs（Cnn14\_DecisionLevelMax）作检测器并限定六类游戏声音，另以人工标注微调 PANNs（按片段留出测试）。三个版本先按整段 RMS 对齐，阈值在原始轨上确定。
+只看单一类别时 FPS AI 检出率下降 $7.4$ 个百分点，但该类别对游戏脚步的绝对概率极低（阈值 0.0037）；限定六类或微调后变化均不显著（表~\ref{tab:detect}）。
+这些检测器原始轨 AUC 仅约 0.8，未达评测方案准入要求，本分析不作为可检测性结论。
+
+\input{tables/detect}
+
+\section{复现说明}
+脚本位于 \texttt{analysis/}，按以下顺序运行：
+\begin{enumerate}
+\item \texttt{analyze.py}：事件检测与三轨增益计算；
+\item \texttt{embed.py}、\texttt{embed\_clap.py}：提取 AST / CLAP 嵌入；
+\item \texttt{train\_labeler.py}：训练标注模型并生成各轮候选；
+\item \texttt{extract\_clean.py}：导出三轨纯净事件库；
+\item \texttt{report\_ad.py}：同电平对比与匹配静态 EQ；
+\item \texttt{detectability.py}、\texttt{finetune\_panns.py}：附录 B 的探索性分析；
+\item \texttt{report\_tex.py}：生成本报告的全部表格、图表数据与草图并编译。
+\end{enumerate}
+图表数据位于 \texttt{docs/report\_tex/figures/data/}；三轨纯净事件库位于 \texttt{analysis/clean\_events/}（272 个事件）；
+人工标注与标注工具位于 \texttt{analysis/labeling/}。
+
+\section{参考文献}
+\begin{enumerate}[label={[\arabic*]},leftmargin=2.2em]\small
+\item Gemmeke J F, et al. Audio Set: An ontology and human-labeled dataset for audio events. ICASSP, 2017.
+\item Kong Q, et al. PANNs: Large-scale pretrained audio neural networks for audio pattern recognition. IEEE/ACM TASLP, 2020.
+\item Gong Y, Chung Y A, Glass J. AST: Audio Spectrogram Transformer. Interspeech, 2021.
+\item Wu Y, et al. Large-scale contrastive language-audio pretraining with feature fusion and keyword-to-caption augmentation. ICASSP, 2023.
+\item Settles B. Active learning literature survey. University of Wisconsin--Madison, 2009.
+\item Bello J P, et al. A tutorial on onset detection in music signals. IEEE TSAP, 2005.
+\item Mesaros A, Heittola T, Virtanen T. Metrics for polyphonic sound event detection. Applied Sciences, 2016.
+\item Bristow-Johnson R. Cookbook formulae for audio EQ biquad filter coefficients.
+\item Cohen J. A coefficient of agreement for nominal scales. Educational and Psychological Measurement, 1960.
+\item Field C A, Welsh A H. Bootstrapping clustered data. JRSS-B, 2007.
+\item Fosi Audio. C3 游戏声卡宣传册.
+\end{enumerate}
+\end{document}

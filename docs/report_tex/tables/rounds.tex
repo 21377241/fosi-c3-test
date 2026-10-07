@@ -1,0 +1,14 @@
+\begin{table}[htbp]\centering
+\caption{四轮人工标注的抽样策略与类别构成}\label{tab:rounds}
+{\small\begin{threeparttable}
+\begin{tabularx}{\linewidth}{lcLLcccc}\toprule
+轮次 & 条数 & 抽样策略 & 目的 & 脚步 & 枪声 & 其他 & 不确定 \\
+\midrule
+第 1 轮 & 153 & 按片段 $\times$ 电平分层随机 & 初始训练集；无偏精度核对 & 114 & 19 & 13 & 7 \\
+第 2 轮 & 80 & 两分支意见相反或集成概率居中（每段至多 6 个） & 主动学习，补充决策边界 & 39 & 32 & 4 & 5 \\
+第 3 轮 & 60 & 不确定事件按峰值分层 50 个 + 响亮高置信度脚步 10 个 & 补齐响脚步 / 弱枪声 & 36 & 18 & 3 & 3 \\
+第 4 轮 & 55 & 剩余不确定事件按峰值分两层随机 & 补充剩余难例 & 30 & 20 & 3 & 2 \\
+合计 & 348 &  &  & 219 & 89 & 23 & 17 \\
+\bottomrule\end{tabularx}
+\begin{tablenotes}\footnotesize\item 表中为各轮首次标注结果；盲审复核后有 5 条改判，最终人工标签统计见表 \ref{tab:label_ba}。\end{tablenotes}\end{threeparttable}}
+\end{table}

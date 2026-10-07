@@ -1,0 +1,14 @@
+\begin{table}[htbp]\centering
+\caption{脚步增益（dB）：总体与按原始电平分档}\label{tab:gain_a}
+{\small\begin{threeparttable}
+\begin{tabular}{lcccccc}\toprule
+样本 & n & FPS AI 中位 [95\% CI] & 3--9 dB & $>$ 9 dB & $<$ 3 dB & 实际 EQ 中位 \\
+\midrule
+人工确认 & 170 & $+$8.7 [$+$8.2, $+$10.2] & 52\% & 42\% & 6\% & $-$0.8 \\
+人工 + 模型高置信度 & 1192 & $+$8.5 [$+$8.0, $+$11.0] & 61\% & 37\% & 3\% & $-$1.0 \\
+其中 $<$ $-$40 dBFS & 1105 & $+$8.5 & 61\% & 37\% & 2\% & $-$1.0 \\
+其中 $-$40 $\sim$ $-$35 dBFS & 62 & $+$8.6 & 44\% & 44\% & 13\% & $-$1.5 \\
+其中 $>$ $-$35 dBFS & 25 & $+$7.8 & 80\% & 8\% & 12\% & $-$2.6 \\
+\bottomrule\end{tabular}
+\begin{tablenotes}\footnotesize\item 电平分档基于“人工 + 模型高置信度”样本。\item > $-35$ dBFS 的 25 个脚步来自 7 个片段，增益主要由片段决定，不作稳定结论。\end{tablenotes}\end{threeparttable}}
+\end{table}

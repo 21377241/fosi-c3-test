@@ -1,0 +1,16 @@
+\begin{table}[htbp]\centering
+\caption{标注前后的脚步识别精度（第 1 轮随机样本 147 条，以人工判断为准）}\label{tab:b_before_after}
+{\small\begin{threeparttable}
+\begin{tabularx}{\linewidth}{Lccc}\toprule
+指标 & \makecell{标注前\\现成模型 + 规则} & \makecell{标注前\\CLAP 零样本} & \makecell{\textbf{标注后}\\\textbf{人机协同模型}} \\
+\midrule
+区分能力 AUC（1.0 为完美） & 0.81 & 0.79 & 0.89 \\
+能给出明确判断的比例 & 46\% & 59\% & 67\% \\
+给出判断时的正确率 & 64\% & 81\% & 93\% \\
+真脚步中被认出的比例（共 112 个） & 29\% & 46\% & 66\% \\
+真非脚步中被认出的比例（共 35 个） & 31\% & 51\% & 51\% \\
+判错的比例 & 16\% & 11\% & 5\% \\
+全部 1620 个事件中有明确标签的比例 & 38\% & -- & 93\% \\
+\bottomrule\end{tabularx}
+\begin{tablenotes}\footnotesize\item “现成模型 + 规则”为 AudioSet 预训练声音分类器的脚步 / 枪声概率加阈值规则，即标注前实际使用的自动标签。\item 标注后模型的结果均为留片段交叉验证：评估某个事件时，模型没有见过该事件所在的整段录音。三区间判定：p $\geq$ 0.8 判脚步，p $\leq$ 0.2 判非脚步，其余为“判不出”。\item 最后一行的“标注后”包含人工标注本身（人工优先）与模型高置信判定。\end{tablenotes}\end{threeparttable}}
+\end{table}

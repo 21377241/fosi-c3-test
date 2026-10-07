@@ -1,0 +1,14 @@
+\begin{table}[htbp]\centering
+\caption{标注前后的事件判别情况（全部 1620 个事件）}\label{tab:label_ba}
+{\small\begin{threeparttable}
+\begin{tabularx}{\linewidth}{lLL}\toprule
+项目 & \makecell{标注前\\现成模型 + 规则} & \makecell{标注后\\人工标注 + 最终模型} \\
+\midrule
+判为脚步 & 328（20\%） & 1239（76\%），其中人工 217 \\
+判为非脚步 & 295（18\%） & 271（17\%），其中人工 115 \\
+判不出（排除） & 997（61.5\%） & 110（6.8\%）：模型拿不准 94（5.8\%）+ 人工不确定 16 \\
+由人工直接确定 & 0 & 348 \\
+给出判断时的正确率* & 64\% & 93\% \\
+\bottomrule\end{tabularx}
+\begin{tablenotes}\footnotesize\item “现成模型 + 规则”为 AudioSet 预训练声音分类器的脚步 / 枪声概率加阈值规则，即标注前使用的自动标签。\item 标注后人工标注一律优先，其余事件由最终模型按三区间判定：p $\geq$ 0.8 判脚步、p $\leq$ 0.2 判非脚步，其余为“判不出”。\item * 以第 1 轮随机样本 147 条的人工判断为准估计；标注后为最终模型的留片段交叉验证结果（人工标注事件以人工为准，无需估计）。\end{tablenotes}\end{threeparttable}}
+\end{table}

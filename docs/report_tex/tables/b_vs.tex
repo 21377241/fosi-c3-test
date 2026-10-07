@@ -1,0 +1,18 @@
+\begin{table}[htbp]\centering
+\caption{FPS AI 与 EQ 正面对比（单位 dB，除注明外）}\label{tab:b_vs}
+{\footnotesize\begin{threeparttable}
+\begin{tabularx}{\linewidth}{Lccccc}\toprule
+对比项 & 期望 & \textbf{FPS AI} & 实际 EQ & \makecell{匹配 EQ\\（模拟）} & 表现最好 \\
+\midrule
+脚步被放大多少（中位） & 越大越好 & $+$8.7 & $-$0.8 & $+$8.7 & FPS AI = 匹配 EQ \\
+脚步被放大 $\geq$ 3 dB 的比例 & 越大越好 & 94\% & 1\% & 100\% & 匹配 EQ \\
+枪声被放大多少（中位） & 接近 0 & $+$0.2 & $-$1.0 & $+$8.8 & FPS AI \\
+同音量下，枪声比脚步少放大 & 越大越好 & $+$7.6 & $-$0.4 & $-$0.1 & FPS AI \\
+非脚步被误放大（$>$ 3 dB）的比例 & 越小越好 & 17\% & 15\% & 100\% & 实际 EQ \\
+背景段被放大多少（中位） & 接近 0 & $+$0.5 & $-$1.2 & $+$8.6 & FPS AI \\
+枪声音色改变（频谱误差，dB$^{2}$） & 越小越好 & 1.3 & 8.1 & 82.4 & FPS AI \\
+响亮片段最大音量变化 & 接近 0 & $+$0.1 & $-$0.5 & -- & FPS AI \\
+选择性：脚步增益 $-$ 非脚步增益 & 越大越好 & $+$4.8 & $-$0.2 & $-$0.3 & FPS AI \\
+\bottomrule\end{tabularx}
+\begin{tablenotes}\footnotesize\item 实际 EQ 的误放大比例（15\%）与 FPS AI（17\%）相近，但它同样没有放大脚步；匹配 EQ 能把脚步放大到与 FPS AI 相同，但枪声、背景也一起被放大。\item “同音量下”指与该枪声音量相差 3 dB 以内的脚步作对照，排除“枪声本来就响”的影响。\end{tablenotes}\end{threeparttable}}
+\end{table}
