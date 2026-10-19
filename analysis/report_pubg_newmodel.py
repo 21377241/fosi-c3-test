@@ -385,7 +385,8 @@ TEMPLATE = PREAMBLE + r"""
 
 \section{一句话}
 \keybox{新模型在 PUBG 上\textbf{兑现了“少抬底噪”}；脚步增强未削弱。
-事件级误增强与枪声音色有一定回退，但不构成主能力全面变差——若验收只盯背景口径，可以过；若同时卡 FER/音色，需另议。}
+事件级误增强与枪声音色有一定回退，但不构成主能力全面变差——若验收只盯背景口径，可以过；若同时卡 FER/音色，需另议。\\[2pt]
+\textbf{局限：}背景空隙仅 [[n_bg]] 段、仅限 PUBG，宜作方向性证据，不足以单独支撑全产品线定论。}
 
 \vspace{6mm}
 {\small 复现：\texttt{python analysis/report\_pubg\_newmodel.py}\par}
@@ -468,6 +469,7 @@ def build_html(vb, s, bf, other_verdict, other_detail, fig_ex=None, fig_claim=No
   以段内安静帧（短时电平 &lt; −65 dBFS）中位增益衡量底噪：超过 3 dB 的段由
   {pct(vb["rate_o"])} 降至 {pct(vb["rate_n"])}，中位增益 {sgn(vb["med_o"])} → {sgn(vb["med_n"])} dB。
   <div class="sub"><b>其他能力 · </b>{other_verdict}</div>
+  <div class="sub"><b>局限 · </b>背景空隙仅 {len(bf)} 段、仅限 PUBG，宜作方向性证据，不足以单独支撑全产品线定论。</div>
 </div>
 
 <div class="readouts">

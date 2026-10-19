@@ -1400,6 +1400,7 @@ H1 中脚步增强效果明确，但增益分布与 3--9 dB 区间仅部分重�
 \input{tables/nm_other}
 
 综合：在官方“少抬环境底噪”口径下，PUBG 安静帧证据\textbf{支持}新模型改善；主能力未见明显削弱。
+须强调：本节背景空隙仅 [[nm_n_bg]] 段、且仅限 PUBG，宜作\textbf{方向性证据}，不足以单独支撑全产品线定论。
 完整试听与独立短报告见仓库 \texttt{docs/} 下的 PUBG 新旧模型对比 HTML / PDF；代码：\url{https://github.com/21377241/fosi-c3-test}。
 
 \section{局限与后续工作}\label{sec:limit}
