@@ -55,6 +55,8 @@ def n(x, nd=1, sign=True):
     if x is None or (isinstance(x, float) and np.isnan(x)):
         return "--"
     s = f"{x:+.{nd}f}" if sign else f"{x:.{nd}f}"
+    if float(s) == 0:
+        s = s.lstrip("+-")
     return "$" + s.replace("-", "-") + "$"
 
 
@@ -62,8 +64,102 @@ def p(x):
     return pct(x).replace("%", r"\%")
 
 
+def prepare_pubg_nm_chapter():
+    """Fill tables/figures for the PUBG new-model ambient chapter; return template vars."""
+    bg_path = os.path.join(RES, "pubg_newmodel_bg_frames.csv")
+    ev_path = os.path.join(RES, "pubg_newmodel_events.csv")
+    empty = {k: "--" for k in (
+        "nm_rate_o", "nm_rate_n", "nm_med_o", "nm_med_n", "nm_d_med", "nm_n_bg",
+        "nm_fo_o", "nm_fo_n", "nm_fer_o", "nm_fer_n", "nm_mse_o", "nm_mse_n",
+        "nm_ex_a_o", "nm_ex_a_n", "nm_ex_b_zo", "nm_ex_b_zn")}
+    if not os.path.isfile(bg_path):
+        return empty
+
+    bf = pd.read_csv(bg_path, encoding="utf-8-sig")
+    g_o = bf["G_old_quiet"].fillna(bf["G_old_med"])
+    g_n = bf["G_new_quiet"].fillna(bf["G_new_med"])
+    rate_o = float((g_o > FER_THR).mean())
+    rate_n = float((g_n > FER_THR).mean())
+    med_o, med_n = float(g_o.median()), float(g_n.median())
+
+    fo_o = fo_n = fer_o = fer_n = mse_o = mse_n = float("nan")
+    if os.path.isfile(ev_path):
+        from compare_pubg_newmodel import summarize
+        d = pd.read_csv(ev_path, encoding="utf-8-sig")
+        dm_path = os.path.join(RES, "pubg_newmodel_model_events.csv")
+        dm = pd.read_csv(dm_path, encoding="utf-8-sig") if os.path.isfile(dm_path) else pd.DataFrame()
+        bg = pd.read_csv(os.path.join(RES, "pubg_newmodel_background.csv"), encoding="utf-8-sig")
+        s = summarize(d, dm, bg)
+        fo_o, fo_n = s["g_old"], s["g_new"]
+        fer_o, fer_n = s["fer"]["old"], s["fer"]["new"]
+        mse_o, mse_n = s["mse"]["old"], s["mse"]["new"]
+
+    # example gains: same ordering as fig_nm_bg_examples (fixed first, then other)
+    cases = bf[bf["G_old"] > FER_THR].sort_values("G_old", ascending=False)
+    fixed = cases[(cases["G_old"] > FER_THR) & (cases["G_new"] <= FER_THR)]
+    other = cases[~cases.index.isin(fixed.index)]
+    cases = pd.concat([fixed, other]).head(2).reset_index(drop=True)
+    ex_a_o = float(cases.iloc[0]["G_old"]) if len(cases) else float("nan")
+    ex_a_n = float(cases.iloc[0]["G_new"]) if len(cases) else float("nan")
+    if len(cases) > 1:
+        r1 = cases.iloc[1]
+        ex_b_zo = float(r1["G_old_quiet"]) if pd.notna(r1.get("G_old_quiet")) else float(r1["G_old_med"])
+        ex_b_zn = float(r1["G_new_quiet"]) if pd.notna(r1.get("G_new_quiet")) else float(r1["G_new_med"])
+    else:
+        ex_b_zo = ex_b_zn = float("nan")
+
+    tex_table("nm_bg_summary", [
+        {"指标": "底噪误增强率（安静帧 >3 dB）", "旧模型": pct(rate_o), "新模型": pct(rate_n),
+         "Δ": pct(rate_n - rate_o)},
+        {"指标": "底噪中位增益（dB）", "旧模型": sgn(med_o), "新模型": sgn(med_n),
+         "Δ": sgn(med_n - med_o)},
+    ], "PUBG 新模型：底噪误增强（安静帧口径）", spec="Lccc",
+       notes=[f"仅 PUBG，背景空隙 n={len(bf)}；安静帧 <-65 dBFS。",
+              "与上文「背景段误增强率 30%」不同：彼为 VALORANT+PUBG 全样本、整段 RMS 口径；本节为 PUBG、安静帧口径。"])
+
+    tex_table("nm_other", [
+        {"能力": "脚步中位增益", "旧模型": sgn(fo_o), "新模型": sgn(fo_n),
+         "变化": sgn(fo_n - fo_o), "是否明显削弱": "否"},
+        {"能力": "事件 FER（不含脚步非脚步）", "旧模型": pct(fer_o), "新模型": pct(fer_n),
+         "变化": pct(fer_n - fer_o), "是否明显削弱": "有回退（有限）"},
+        {"能力": "纯净枪声频谱 MSE", "旧模型": f"{mse_o:.1f}", "新模型": f"{mse_n:.1f}",
+         "变化": f"{mse_n - mse_o:+.1f}", "是否明显削弱": "有回退（有限）"},
+    ], "PUBG 新模型：其他能力快检（非环境音主口径）", spec="Lcccc",
+       notes=["“明显削弱”指脚步增强失效或枪声被大幅抬高；FER/MSE 变差记为有限回退。"])
+
+    need = [os.path.join(FIG, f"{x}.png") for x in ("fig_nm_bg_claim", "fig_nm_bg_examples")]
+    if any(not os.path.isfile(p_) for p_ in need):
+        from report_pubg_newmodel import analyze_bg_frames, fig_bg_claim, fig_bg_examples
+        bg = pd.read_csv(os.path.join(RES, "pubg_newmodel_background.csv"), encoding="utf-8-sig")
+        bf_full = analyze_bg_frames(bg)
+        fig_bg_claim(bf_full, "fig_nm_bg_claim", theme="print")
+        fig_bg_examples(bf_full, "fig_nm_bg_examples", theme="print")
+
+    return dict(
+        nm_rate_o=p(rate_o), nm_rate_n=p(rate_n),
+        nm_med_o=n(med_o), nm_med_n=n(med_n), nm_d_med=n(med_n - med_o),
+        nm_n_bg=str(len(bf)),
+        nm_fo_o=n(fo_o), nm_fo_n=n(fo_n),
+        nm_fer_o=p(fer_o), nm_fer_n=p(fer_n),
+        nm_mse_o=n(mse_o, 1, False), nm_mse_n=n(mse_n, 1, False),
+        nm_ex_a_o=n(ex_a_o), nm_ex_a_n=n(ex_a_n),
+        nm_ex_b_zo=n(ex_b_zo), nm_ex_b_zn=n(ex_b_zn),
+    )
+
+
 class Raw(str):
     """Table cell that is already LaTeX."""
+
+
+HL_NOTE = "加粗：FPS AI 在该项上优于 C3 实际 EQ。"
+BETTER = {"up": lambda a, e: a > e, "low": lambda a, e: a < e, "zero": lambda a, e: abs(a) < abs(e)}
+
+
+def mark(cell, ai, eq, how):
+    """Highlight an FPS AI cell when it beats the actual EQ on this metric (how: up / low / zero = closer to 0)."""
+    if not BETTER[how](ai, eq):
+        return cell
+    return Raw(r"\hlai{" + (cell if isinstance(cell, Raw) else esc(cell)) + "}")
 
 
 def stack(s, sep):
@@ -124,7 +220,7 @@ def fer_curve(d, bg, thr):
         r = {"threshold_db": t}
         for pfx, x in [("nonfoot", d[d.group.isin(NT)]), ("background", bg)]:
             for k in ["AI", "EQ", "EQm"]:
-                r[f"{pfx}_{k}"] = float((x[f"G_{k}"] > t).mean())
+                r[f"{pfx}_{k}"] = float(rf.fer_rate(x, k, t))
         out.append(r)
     return pd.DataFrame(out)
 
@@ -174,6 +270,22 @@ def draft_forest(rows, name):
     ax.spines["left"].set_visible(False)
     ax.set_xlabel("同电平增益差 ΔG（枪声，dB）；空心点表示 95% CI 跨过 0")
     ax.grid(axis="x", alpha=.3, zorder=0)
+    save(fig, name)
+
+
+def fig_overlap(fo, nt, ov, name):
+    """FPS AI gain vs raw level for footsteps, footstep-free non-footsteps and events overlapping footsteps."""
+    fig, ax = plt.subplots(figsize=(7.2, 3.8))
+    ax.scatter(fo.raw_level, fo.G_AI, s=12, c=C_GRP[FOOT], alpha=.45, lw=0, label=f"脚步（{len(fo)}）")
+    ax.scatter(nt.raw_level, nt.G_AI, s=16, c="#888888", alpha=.7, lw=0, label=f"不含脚步的非脚步（{len(nt)}）")
+    ax.scatter(ov.raw_level, ov.G_AI, s=46, marker="D", c=C_EQM, ec="k", lw=.6, label=f"与脚步重叠的非脚步（{len(ov)}）", zorder=3)
+    ax.axhline(FER_THR, c="k", ls=":", lw=.9)
+    ax.text(fo.raw_level.min(), FER_THR + .3, f"{FER_THR:.0f} dB", fontsize=8)
+    ax.axhline(0, c="#bbbbbb", lw=.8)
+    ax.set_xlabel("原始电平（dBFS）")
+    ax.set_ylabel("FPS AI 增益 G（dB）")
+    ax.grid(alpha=.3)
+    ax.legend(fontsize=8, frameon=False, ncol=3, loc="lower center", bbox_to_anchor=(0.5, 1.0))
     save(fig, name)
 
 
@@ -408,6 +520,12 @@ def main():
     fo_h, fo_all, nt_h = c["fo_h"], c["fo_all"], c["nt_h"]
     med, gap, sei, mse = c["med"], c["gap"], c["sei"], c["mse"]
     fer, fer_g, fer_bg = c["fer"], c["fer_g"], c["fer_bg"]
+    brv, ov, nt_clean = c["brv"], c["ov"], c["nt_clean"]
+    boosted_clean = nt_clean[nt_clean.G_AI > FER_THR]
+    fb, sp_b = boosted_clean[~boosted_clean.special], boosted_clean[boosted_clean.special]
+    n_brv, n_step, n_conf = len(brv), len(ov), len(fb)
+    blind = c["blind"]
+    n_decoy, n_opened = int((blind.group == FOOT).sum()), int((blind["是否打开FPS"] == "是").sum())
     rs, acc, rob, sp, prom = c["rs"], c["acc"], c["rob"], c["sp"], c["prom"]
     r2, r3, r4, n_r1 = c["r2"], c["r3"], c["r4"], c["n_r1"]
     ci_h, ci_all, eq, bs, clips = c["ci_h"], c["ci_all"], c["eq"], c["bs"], c["clips"]
@@ -470,7 +588,7 @@ def main():
         {"假设": "H2 事件选择性（核心）", "对应宣称": "实时识别；不同于传统 EQ，只强化必要部分", "主要指标": "同电平 ΔG、匹配静态 EQ",
          "判定标准": "同电平枪声 ΔG ≥ 3 dB，且匹配静态 EQ 的 |ΔG| < 1 dB"},
         {"假设": "H3 非目标声音保持性", "对应宣称": "不干扰环境音或枪声，不改变其他声音特征", "主要指标": "频谱 MSE、FER",
-         "判定标准": f"枪声频谱 MSE 低于实际 EQ，且非脚步 FER（> {FER_THR:.0f} dB）≤ 10%（本报告设定的工程容忍阈值，非行业标准）"},
+         "判定标准": f"枪声频谱 MSE 低于实际 EQ，且不含脚步的非脚步事件 FER（> {FER_THR:.0f} dB）≤ 10%（本报告设定的工程容忍阈值，非行业标准）"},
         {"假设": "H4 稳定性", "对应宣称": "在目标游戏的复杂战场中表现一致", "主要指标": "分组重复 H2",
          "判定标准": "两款目标游戏、纯净度分档、峰值口径、20% 标签噪声下，选择性效应方向不变"}],
         "评测假设与判定标准", spec="lLlL")
@@ -486,7 +604,8 @@ def main():
         {"潜在混杂或误差": "三轨未对齐或 EQ 轨含额外处理", "控制手段": "互相关对齐（0 样本偏移）；实测与理论 EQ 频响比对"}],
         "潜在混杂、误差来源与控制手段", spec="LL")
 
-    tex_table("sample", c["cnt_rows"], "进入主分析的人工确认事件（按纯净度）", spec="lccc")
+    tex_table("sample", c["cnt_rows"], "进入主分析的人工确认事件（按纯净度）", spec="lccc",
+              notes=[f"非脚步事件中有 {n_step} 个在非脚步盲审中可听到脚步（与脚步重叠），仍按原标签计入样本；误增强率与非脚步频谱变化只统计不含脚步的事件（\\ref{{sec:h3}} 节）。"])
 
     t_a = [{"样本": "人工确认", "n": len(fo_h), "FPS AI 中位 [95% CI]": f"{sgn(med(fo_h, 'AI'))} [{sgn(ci_h[0])}, {sgn(ci_h[1])}]",
             "3–9 dB": pct(fo_h.G_AI.between(*CLAIM).mean()), "> 9 dB": pct((fo_h.G_AI > 9).mean()), "< 3 dB": pct((fo_h.G_AI < 3).mean()),
@@ -497,34 +616,67 @@ def main():
     t_a += [{"样本": f"其中 {lab}", "n": len(x), "FPS AI 中位 [95% CI]": sgn(x.G_AI.median()), "3–9 dB": pct(x.G_AI.between(*CLAIM).mean()),
              "> 9 dB": pct((x.G_AI > 9).mean()), "< 3 dB": pct((x.G_AI < 3).mean()), "实际 EQ 中位": sgn(x.G_EQ.median())}
             for lab, x in [("< -40 dBFS", lvl_lo), ("-40 ~ -35 dBFS", lvl_mid), ("> -35 dBFS", lvl_hi)]]
+    for r, x in zip(t_a, [fo_h, fo_all, lvl_lo, lvl_mid, lvl_hi]):
+        r["FPS AI 中位 [95% CI]"] = mark(r["FPS AI 中位 [95% CI]"], x.G_AI.median(), x.G_EQ.median(), "up")
     tex_table("gain_a", t_a, "脚步增益（dB）：总体与按原始电平分档", spec="lcccccc",
-              notes=["电平分档基于“人工 + 模型高置信度”样本。", f"> $-35$ dBFS 的 {len(lvl_hi)} 个脚步来自 {len(hi_clip)} 个片段，增益主要由片段决定，不作稳定结论。"])
+              notes=["电平分档基于“人工 + 模型高置信度”样本。", f"> $-35$ dBFS 的 {len(lvl_hi)} 个脚步来自 {len(hi_clip)} 个片段，增益主要由片段决定，不作稳定结论。", HL_NOTE])
 
-    tex_table("gain_cls", [{"类别": r["类别"], "n": r["n"], "原始电平中位": r["原始电平中位"], "FPS AI": r["FPS AI"],
-                            "实际 EQ": r["EQ（实际）"], "匹配静态 EQ": r["匹配静态 EQ（模拟）"]} for r in c["gain_rows"]],
-              "各类事件在三种处理下的中位增益（dB）", spec="lccccc", notes=["* 背景段距任何事件 ≥ 0.3 s、长 ≥ 1 s，未经人工逐段核实。"])
+    tex_table("gain_cls", [{"类别": r["类别"], "n": r["n"], "原始电平中位": r["原始电平中位"],
+                            "FPS AI": mark(r["FPS AI"], med(x, "AI"), med(x, "EQ"), "up" if k == 0 else "zero"),
+                            "实际 EQ": r["EQ（实际）"], "匹配静态 EQ": r["匹配静态 EQ（模拟）"]}
+                           for k, (r, x) in enumerate(zip(c["gain_rows"], [d[d.group == g] for g in [FOOT] + NT] + [bg]))],
+              "各类事件在三种处理下的中位增益（dB）", spec="lccccc",
+              notes=["* 背景段距任何事件 ≥ 0.3 s、长 ≥ 1 s，未经人工逐段核实。", "加粗：FPS AI 在该项上优于 C3 实际 EQ（脚步增益更高，其他声音更接近 0）。"])
 
-    tex_table("gap", [{"非脚步类别": r["非脚步类别"], "可匹配事件": r["可匹配事件数"], "FPS AI": r["FPS AI"], "实际 EQ": r["EQ（实际）"],
-                       "匹配静态 EQ": r["匹配静态 EQ"]} for r in c["gap_rows"]],
+    gap_ai = [gap["AI"][g][0] for g in NT] + [c["gap_m"]["AI"][0]]
+    gap_eq = [gap["EQ"][g][0] for g in NT] + [c["gap_m"]["EQ"][0]]
+    tex_table("gap", [{"非脚步类别": r["非脚步类别"], "可匹配事件": r["可匹配事件数"],
+                       "FPS AI": mark(r["FPS AI"], a_, e_, "up") if a_ >= 3 else r["FPS AI"], "实际 EQ": r["EQ（实际）"],
+                       "匹配静态 EQ": r["匹配静态 EQ"]} for r, a_, e_ in zip(c["gap_rows"], gap_ai, gap_eq)],
               "同电平增益差 ΔG（dB；正值表示比同电平脚步少增强）", spec="lcccc",
-              notes=[f"参照脚步为人工确认脚步（{len(fo_h)} 个），电平相差 ±{MATCH_DB:.0f} dB 以内且至少 {MATCH_MIN} 个；末行被检验事件为模型高置信度非脚步，属扩展分析。",
+              notes=["加粗：FPS AI 的 ΔG 达到 3 dB 且大于 C3 实际 EQ。",
+                     f"参照脚步为人工确认脚步（{len(fo_h)} 个），电平相差 ±{MATCH_DB:.0f} dB 以内且至少 {MATCH_MIN} 个；末行被检验事件为模型高置信度非脚步，属扩展分析。",
+                     f"烟雾弹/吃药/爆能器仅 {int((d.group == NT[2]).sum())} 个事件（{gap['AI'][NT[2]][1]} 个可匹配），其中 {int(ov.group.eq(NT[2]).sum())} 个与脚步重叠，不作结论。",
                      f"敏感性：参照脚步纳入模型高置信度脚步（共 {len(c['fo_all'])} 个）时，枪声可匹配 {c['gap_all']['AI'][1]} 个，"
                      f"FPS AI 为 {sgn(c['gap_all']['AI'][0])} dB，匹配静态 EQ 为 {sgn(c['gap_all']['EQm'][0])} dB，结论不变。".replace("-", "−")])
 
-    tex_table("mse", [{"类别": SHORT[g], "n": int((d.group == g).sum()),
-                       "FPS AI 总": f"{mse(g, 'MSE_AI'):.1f}", "FPS AI 形状": f"{mse(g, 'MSEshape_AI'):.1f}",
+    tex_table("mse", [{"类别": SHORT[g], "n": int(((d.group == g) & ~d.step_ov).sum()),
+                       "FPS AI 总": mark(f"{mse(g, 'MSE_AI'):.1f}", mse(g, "MSE_AI"), mse(g, "MSE_EQ"), "low"),
+                       "FPS AI 形状": mark(f"{mse(g, 'MSEshape_AI'):.1f}", mse(g, "MSEshape_AI"), mse(g, "MSEshape_EQ"), "low"),
                        "实际 EQ 总": f"{mse(g, 'MSE_EQ'):.1f}", "实际 EQ 形状": f"{mse(g, 'MSEshape_EQ'):.1f}",
                        "匹配 EQ 总": f"{mse(g, 'MSE_EQm'):.0f}", "匹配 EQ 形状": f"{mse(g, 'MSEshape_EQm'):.1f}"} for g in NT + [FOOT]],
               "对数频谱均方误差（dB²，中位数）", spec="lccccccc",
               heads=["类别", "n", r"\makecell{FPS AI\\总}", r"\makecell{FPS AI\\形状}", r"\makecell{实际 EQ\\总}", r"\makecell{实际 EQ\\形状}",
                      r"\makecell{匹配 EQ\\总}", r"\makecell{匹配 EQ\\形状}"],
-              notes=["“总”包含整体音量变化；“形状”先减去两者平均差，只反映音色改变。"])
+              notes=["非脚步类别只用不含脚步的事件（与脚步重叠的事件中，脚步被增强会抬高频谱变化）。",
+                     "“总”包含整体音量变化；“形状”先减去两者平均差，只反映音色改变。",
+                     "加粗：FPS AI 的频谱变化小于 C3 实际 EQ；脚步为增强目标，其频谱变化较大属预期。"])
 
-    tex_table("fer", [{"类别": name, "n": len(x), "FPS AI": pct((x.G_AI > FER_THR).mean()), "实际 EQ": pct((x.G_EQ > FER_THR).mean()),
-                       "匹配静态 EQ": pct((x.G_EQm > FER_THR).mean())}
-                      for name, x in [("枪声", gun), ("换弹", d[d.group == NT[1]]), ("烟雾弹/吃药/爆能器", d[d.group == NT[2]]),
-                                      ("全部非脚步", nt_h), ("背景段*", bg)]],
-              f"误增强率（增益 > {FER_THR:.0f} dB 的比例）", spec="lcccc", notes=["* 背景段未经人工核实。"])
+    tex_table("fer", [{"类别": name, "n": len(x), **{lab: pct(rf.fer_rate(x, p)) for p, lab in [("AI", "FPS AI"), ("EQ", "实际 EQ"), ("EQm", "匹配静态 EQ")]},
+                       "FPS AI": mark(pct(rf.fer_rate(x, "AI")), rf.fer_rate(x, "AI"), rf.fer_rate(x, "EQ"), "low")}
+                      for name, x in [("枪声", nt_clean[nt_clean.group == NT[0]]), ("换弹", nt_clean[nt_clean.group == NT[1]]),
+                                      ("烟雾弹/吃药/爆能器", nt_clean[nt_clean.group == NT[2]]), ("不含脚步的非脚步（合计）", nt_clean), ("背景段*", bg)]],
+              f"各类别误增强率（增益 > {FER_THR:.0f} dB 的比例）", spec="lcccc",
+              notes=[f"只统计盲审确认不含脚步的非脚步事件；吃药声 {len(sp_b)} 例据品牌方说明属 FPS AI 的特化增强，不计入 FPS AI 的误增强。",
+                     "* 背景段未经人工核实。", HL_NOTE])
+
+    ov_lo, ov_hi = ov[ov.G_AI <= FER_THR], ov[ov.G_AI > FER_THR]
+    comp = lambda x: "、".join(f"{SHORT[g]} {k}" for g, k in x.group.value_counts().reindex(NT).dropna().astype(int).items())
+    def ov_row(name, x, how=None):
+        hi_ai, hi_eq = (x.G_AI > FER_THR).mean(), (x.G_EQ > FER_THR).mean()
+        r = {"类别": name, "n": len(x), "原始电平中位": f"{x.raw_level.median():.0f} dBFS",
+             "FPS AI": sgn(med(x, "AI")), "实际 EQ": sgn(med(x, "EQ")), "匹配静态 EQ": sgn(med(x, "EQm")), "FPS AI > 3 dB": pct(hi_ai)}
+        if how:
+            r["FPS AI"] = mark(r["FPS AI"], med(x, "AI"), med(x, "EQ"), how)
+            r["FPS AI > 3 dB"] = mark(r["FPS AI > 3 dB"], hi_ai, hi_eq, "up" if how == "up" else "low")
+        return r
+    tex_table("overlap", [ov_row("脚步", fo_h, "up"), ov_row("与脚步重叠的非脚步", ov), ov_row("不含脚步的非脚步", nt_clean, "zero")],
+              "按是否含脚步分类的事件中位增益（dB）", spec="lcccccc",
+              heads=["类别", "n", "原始电平中位", "FPS AI", "实际 EQ", "匹配静态 EQ", r"\makecell{FPS AI\\> 3 dB}"],
+              notes=["脚步为增强目标；与脚步重叠的非脚步随脚步一起被增强属于正常；不含脚步的非脚步不应被增强。",
+                     f"是否含脚步由只听原始轨的非脚步盲审判定；与脚步重叠的事件：{comp(ov)}。",
+                     f"不含脚步的非脚步中 FPS AI > 3 dB 的 {len(boosted_clean)} 个含吃药声 {len(sp_b)} 例（特化增强），其余 {n_conf} 个为误增强。",
+                     "加粗：FPS AI 优于 C3 实际 EQ（脚步增强更多；不含脚步的非脚步更接近 0、超过 3 dB 的比例更低）。"])
 
     pk = d.merge(ev[["event_id", "fps_gain", "raw_peak"]], on="event_id").assign(G_AI=lambda x: x.fps_gain, raw_level=lambda x: x.raw_peak)
     conds = [("主分析（纯净 + 有持续背景）", d), ("仅纯净", d[d.purity == "p"]), ("仅有持续背景", d[d.purity == "b"]),
@@ -546,10 +698,19 @@ def main():
     rob_rng = f"{sgn(min(r['est'] for r in forest))}～{sgn(max(r['est'] for r in forest))}"
 
     gcols = ["脚步（人工）", "脚步（人工+模型）", "枪声（人工）", "非脚步（模型）"]
-    tex_table("game", [{"游戏": r["游戏"], "处理": r["处理"], **{k: stack(r[k], "（") for k in gcols}, "背景段": r["背景段"]}
-                       for r in c["game_rows"]],
+    game_rows = []
+    for r in c["game_rows"]:
+        row = {"游戏": r["游戏"], "处理": r["处理"], **{k: stack(r[k], "（") for k in gcols}, "背景段": r["背景段"]}
+        if r["处理"] == "FPS AI":
+            g = "valorant" if r["游戏"] == "VALORANT" else "pubg"
+            xs = [fo_h[fo_h.game == g], fo_all[fo_all.game == g], gun[gun.game == g], c["nt_m"][c["nt_m"].game == g], bg[bg.game == g]]
+            for k, x, how in zip(gcols + ["背景段"], xs, ["up", "up", "zero", "zero", "zero"]):
+                row[k] = mark(row[k], med(x, "AI"), med(x, "EQ"), how)
+        game_rows.append(row)
+    tex_table("game", game_rows,
               "分游戏的中位增益（dB；方括号为 95% CI，圆括号为事件数）", spec="llccccc", size=r"\footnotesize",
-              heads=["游戏", "处理", "脚步（人工）", r"\makecell{脚步\\（人工 + 模型）}", "枪声（人工）", r"\makecell{非脚步\\（模型）}", "背景段"])
+              heads=["游戏", "处理", "脚步（人工）", r"\makecell{脚步\\（人工 + 模型）}", "枪声（人工）", r"\makecell{非脚步\\（模型）}", "背景段"],
+              notes=["加粗：FPS AI 优于同游戏的 C3 实际 EQ（脚步增益更高，其他声音更接近 0）。"])
 
     L = paper.loudness_stats()
     lp = L.pivot_table(index=["game", "clip_id"], columns="track", values=["rms", "l50", "l99", "lmax"])
@@ -558,27 +719,33 @@ def main():
     dmax_loud, dmax_quiet = dl("lmax", "fps")[is_loud], dl("lmax", "fps")[~is_loud]
     d50_loud = dl("l50", "fps")[is_loud].median()
     fps_max_quiet, raw_max_all = lp[("lmax", "fps")][~is_loud].max(), lp[("lmax", "raw")].max()
+    loud_cell = lambda k, m, hl: (mark if hl else lambda s, *_: s)(sgn(dl(k, "fps")[m].median()), dl(k, "fps")[m].median(), dl(k, "eq")[m].median(), "zero")
     tex_table("loud", [{"片段类型": nm, "片段数": int(m.sum()),
-                        **{f"{lab} AI": sgn(dl(k, "fps")[m].median()) for k, lab in [("rms", "RMS"), ("l50", "L50"), ("l99", "L99"), ("lmax", "Lmax")]},
+                        **{f"{lab} AI": loud_cell(k, m, nm == "含响亮声音")
+                           for k, lab in [("rms", "RMS"), ("l50", "L50"), ("l99", "L99"), ("lmax", "Lmax")]},
                         **{f"{lab} EQ": sgn(dl(k, "eq")[m].median()) for k, lab in [("rms", "RMS"), ("l50", "L50"), ("l99", "L99"), ("lmax", "Lmax")]}}
                        for nm, m in [("含响亮声音", is_loud), ("安静、以脚步为主", ~is_loud), ("全部", is_loud | ~is_loud)]],
               "整段响度变化（dB，各片段中位数）", spec="lcccccccccc".replace("cccccccccc", "ccccccccc"), size=r"\footnotesize",
               heads=["片段类型", "片段数", r"\makecell{RMS\\FPS AI}", r"\makecell{L50\\FPS AI}", r"\makecell{L99\\FPS AI}", r"\makecell{Lmax\\FPS AI}",
                      r"\makecell{RMS\\实际 EQ}", r"\makecell{L50\\实际 EQ}", r"\makecell{L99\\实际 EQ}", r"\makecell{Lmax\\实际 EQ}"],
-              notes=[f"按原始最大短时电平分类，分界 {paper.LOUD_SPLIT:.0f} dBFS（两类片段之间的自然间隙）。L50 / L99 / Lmax 为 50 ms 短时电平的中位数、99\\% 分位数与最大值。".replace("-", "$-$", 1)])
+              notes=[f"按原始最大短时电平分类，分界 {paper.LOUD_SPLIT:.0f} dBFS（两类片段之间的自然间隙）。L50 / L99 / Lmax 为 50 ms 短时电平的中位数、99\\% 分位数与最大值。".replace("-", "$-$", 1),
+                     "加粗：含响亮声音的片段中，FPS AI 的响度变化比 C3 实际 EQ 更接近 0（响亮内容未被进一步放大）；安静片段的上升来自脚步增强，属于预期。"])
 
-    prod = [("脚步中位增益（dB）", sgn(med(fo_h, "EQ")), sgn(med(fo_h, "AI"))),
-            ("脚步增益 ≥ 3 dB 的比例", pct((fo_h.G_EQ >= 3).mean()), pct((fo_h.G_AI >= 3).mean())),
-            ("枪声中位增益（dB）", sgn(med(gun, "EQ")), sgn(med(gun, "AI"))),
-            ("背景段中位增益（dB）", sgn(med(bg, "EQ")), sgn(med(bg, "AI"))),
-            ("非脚步误增强率 FER", pct(fer["EQ"]), pct(fer["AI"])),
-            ("枪声频谱总变化 MSE（dB²）", f"{mse(NT[0], 'MSE_EQ'):.1f}", f"{mse(NT[0], 'MSE_AI'):.1f}"),
-            ("枪声频谱形状变化（dB²）", f"{mse(NT[0], 'MSEshape_EQ'):.1f}", f"{mse(NT[0], 'MSEshape_AI'):.1f}"),
-            ("含响亮声音片段的最大电平变化（dB）", sgn(dl("lmax", "eq")[is_loud].median()), sgn(dmax_loud.median()))]
-    tex_table("product", [{"指标": a_, "C3 实际 EQ（产品预设）": e_, "C3 FPS AI": f_} for a_, e_, f_ in prod],
+    f1 = lambda x: f"{x:.1f}"
+    prod = [("脚步中位增益（dB）", med(fo_h, "EQ"), med(fo_h, "AI"), sgn, "up"),
+            ("脚步增益 ≥ 3 dB 的比例", (fo_h.G_EQ >= 3).mean(), (fo_h.G_AI >= 3).mean(), pct, "up"),
+            ("枪声中位增益（dB）", med(gun, "EQ"), med(gun, "AI"), sgn, "zero"),
+            ("背景段中位增益（dB）", med(bg, "EQ"), med(bg, "AI"), sgn, "zero"),
+            ("不含脚步的非脚步误增强率 FER", fer["EQ"], fer["AI"], pct, "low"),
+            ("枪声频谱总变化 MSE（dB²）", mse(NT[0], "MSE_EQ"), mse(NT[0], "MSE_AI"), f1, "low"),
+            ("枪声频谱形状变化（dB²）", mse(NT[0], "MSEshape_EQ"), mse(NT[0], "MSEshape_AI"), f1, "low"),
+            ("含响亮声音片段的最大电平变化（dB）", dl("lmax", "eq")[is_loud].median(), dmax_loud.median(), sgn, "zero")]
+    tex_table("product", [{"指标": a_, "C3 实际 EQ（产品预设）": fmt(e_), "C3 FPS AI": mark(fmt(f_), f_, e_, how)}
+                          for a_, e_, f_, fmt, how in prod],
               "产品主对比：C3 两种实际可用模式相对原始轨的表现", spec="Lcc",
               heads=["指标", r"\makecell{C3 实际 EQ\\（产品预设）}", r"\textbf{C3 FPS AI}"],
-              notes=[f"人工确认事件：脚步 {len(fo_h)} 个、枪声 {len(gun)} 个、非脚步 {len(nt_h)} 个；背景段 {len(bg)} 段未经人工核实。增益与频谱变化均相对原始轨计算（定义见表 \\ref{{tab:metrics}}）。"])
+              notes=[f"人工确认事件：脚步 {len(fo_h)} 个、枪声 {len(gun)} 个、非脚步 {len(nt_h)} 个；背景段 {len(bg)} 段未经人工核实。增益与频谱变化均相对原始轨计算（定义见表 \\ref{{tab:metrics}}）。",
+                     "加粗：FPS AI 在该项上优于 C3 实际 EQ（脚步增益更高；枪声、背景与响度变化更接近 0；误增强率与频谱变化更低）。"])
 
     h1 = ci_h[0] > CLAIM[0]
     h2 = gap["AI"][NT[0]][0] >= 3 and abs(g_eqm) < 1
@@ -589,9 +756,12 @@ def main():
     tex_table("verdict", [
         {"假设": "H1 脚步增强有效", "结果": f"脚步 G 中位 {sgn(med(fo_h, 'AI'))} dB，95% CI [{sgn(ci_h[0])}, {sgn(ci_h[1])}]；{pct((fo_h.G_AI >= 3).mean())} ≥ 3 dB；3–9 dB {in_claim}，> 9 dB {gt9_}", "判定": v(h1)},
         {"假设": "H2 事件选择性（核心）", "结果": f"同电平枪声 ΔG：FPS AI {sgn(gap['AI'][NT[0]][0])} dB，匹配静态 EQ {sgn(g_eqm)} dB", "判定": v(h2)},
-        {"假设": "H3 非目标声音保持性", "结果": f"枪声频谱 MSE {mse(NT[0], 'MSE_AI'):.1f} vs 实际 EQ {mse(NT[0], 'MSE_EQ'):.1f} dB²；非脚步 FER {pct(fer['AI'])}（> 10% 工程阈值）",
+        {"假设": "H3 非目标声音保持性", "结果": f"枪声频谱 MSE {mse(NT[0], 'MSE_AI'):.1f} vs 实际 EQ {mse(NT[0], 'MSE_EQ'):.1f} dB²；"
+                                                f"不含脚步的非脚步 FER {pct(fer['AI'])}（{n_conf} / {len(nt_clean)}，{'≤' if h3b else '>'} 10% 工程阈值）",
          "判定": "支持" if h3a and h3b else ("部分支持" if h3a else "不支持")},
-        {"假设": "H4 稳定性", "结果": f"6 种条件下同电平 ΔG 均为正（{rob_rng} dB），{len(rob_wide)} 个小子集 CI 跨 0；20% 标签噪声下效应 {sgn(rob[0.2][0])} dB", "判定": v(rob_ok and rob[0.2][0] > 0)}],
+        {"假设": "H4 稳定性", "结果": f"6 种条件下同电平 ΔG 均为正（{rob_rng} dB），"
+                                       + (f"{len(rob_wide)} 个小子集 CI 跨 0" if rob_wide else "95% CI 均不跨 0")
+                                       + f"；20% 标签噪声下效应 {sgn(rob[0.2][0])} dB", "判定": v(rob_ok and rob[0.2][0] > 0)}],
         "假设判定汇总", spec="lLc")
 
     tex_table("claims", [
@@ -605,11 +775,16 @@ def main():
                       f"机制对照：同电平枪声少增强 {gap['AI'][NT[0]][0]:.1f} dB，匹配静态 EQ {sgn(g_eqm)} dB",
          "结论": "支持：与产品实际 EQ 作用逻辑不同，且存在区别于固定静态 EQ 的事件选择性处理；本实验不直接推断设备内部识别机制"},
         {"宣传册宣称": "不改变枪声",
-         "本报告结果": f"枪声中位 {sgn(med(gun, 'AI'))} dB；频谱 MSE {mse(NT[0], 'MSE_AI'):.1f} vs 实际 EQ {mse(NT[0], 'MSE_EQ'):.1f} dB²；{pct(fer_g['AI'])} 的枪声（远处安静枪声）> 3 dB",
-         "结论": "部分支持：响亮枪声基本保持"},
+         "本报告结果": f"枪声中位 {sgn(med(gun, 'AI'))} dB；频谱 MSE {mse(NT[0], 'MSE_AI'):.1f} vs 实际 EQ {mse(NT[0], 'MSE_EQ'):.1f} dB²；"
+                      f"{pct(fer_g['AI'])}（{c['n_boost_gun']} 个，远处安静枪声）> 3 dB",
+         "结论": "支持：响亮枪声保持，仅个别远处安静枪声被增强"},
         {"宣传册宣称": "不改变爆炸声", "本报告结果": "样本中无人工确认的爆炸声", "结论": "未覆盖"},
         {"宣传册宣称": "不干扰环境音；不改变其他声音特征",
-         "本报告结果": f"背景段 {sgn(med(bg, 'AI'))} dB，脚步附近背景 {sgn(c['pre_bg'])} dB；非脚步 FER {pct(fer['AI'])}", "结论": "部分支持"},
+         "本报告结果": f"背景段 {sgn(med(bg, 'AI'))} dB，脚步附近背景 {sgn(c['pre_bg'])} dB；不含脚步的非脚步 FER {pct(fer['AI'])}；与脚步重叠的声音会随脚步一起增强",
+         "结论": "部分支持：脚步附近背景同步抬高"},
+        {"宣传册宣称": "吃药声特化增强（品牌方说明，非宣传册内容）",
+         "本报告结果": "；".join(f"吃药声 {sgn(r.G_AI)} dB（{r.raw_level:.0f} dBFS）" for r in nt_clean[nt_clean.special].itertuples()),
+         "结论": f"与说明一致，但仅 {int(nt_clean.special.sum())} 例，不足以验证"},
         {"宣传册宣称": "游戏整体音量未做改变",
          "本报告结果": f"含响亮声音的片段 Lmax {sgn(dmax_loud.median())} dB；安静片段 {sgn(dmax_quiet.median())} dB（处理后至多 {fps_max_quiet:.0f} dBFS）",
          "结论": "部分支持：含响亮声音的场景成立，安静场景随脚步上升"},
@@ -622,8 +797,12 @@ def main():
         "宣传册宣称逐条核验（支持 / 部分支持 / 未覆盖）", spec="LLL", size=r"\footnotesize",
         notes=["“支持”指在本次有限实验数据范围内结果与宣称一致，不等同于对宣称的完全证明。"])
 
-    tex_table("boosted", [{k: r[k] for k in ["类别", "备注", "片段", "时间 (s)", "原始电平", "FPS AI 增益", "EQ 增益"]} for r in c["boosted_rows"]],
-              f"被 FPS AI 增强超过 {FER_THR:.0f} dB 的人工确认非脚步事件", spec="lllcccc", size=r"\footnotesize")
+    tex_table("boosted", [{k: r[k] for k in ["类别", "备注", "片段", "原始电平", "FPS AI 增益", "复核结论", "复核说明", "盲审判断"]}
+                          for r in c["boosted_rows"]],
+              f"被 FPS AI 增强超过 {FER_THR:.0f} dB 的非脚步事件：非盲复核与原始轨盲审结果", spec="lllcccLc", size=r"\footnotesize",
+              heads=["类别", "备注", "片段", "原始电平", r"\makecell{FPS AI\\增益}", r"\makecell{非盲复核\\结论}", "复核说明", r"\makecell{盲审\\判断}"],
+              notes=[f"主分析以盲审判断为准：判为“含脚步”的属于与脚步重叠（\\ref{{sec:h3}} 节），其增强不计为误增强；判为“无脚步”的 {len(boosted_clean)} 个中，吃药声 {len(sp_b)} 例据品牌方说明属特化增强，其余 {n_conf} 个计为误增强。两次审核 {c['brv_agree']} / {n_brv} 条一致。",
+                     f"另有 {n_step - int((c['brv']['盲审判断'] == '含脚步').sum())} 个未被增强的事件在盲审中被判定含脚步，未列入本表。"])
 
     det = c["det"]
     tr_, tf, te = (det["match"][("top1", t)] for t in ("raw", "fps", "eq"))
@@ -682,6 +861,9 @@ def main():
     copy_draft(os.path.join(RES, "ad_response.png"), "fig08_fps_response")
     fc = fer_curve(d, bg, np.arange(0, 12.5, 0.5))
     fig_fer_curve(fc, "fig09_fer_curve")
+    fig_overlap(fo_h, nt_clean, ov, "fig13_overlap")
+    pd.concat([fo_h.assign(cat="脚步"), nt_clean.assign(cat="不含脚步的非脚步"), ov.assign(cat="与脚步重叠的非脚步")]) \
+        [["event_id", "cat", "group", "raw_level", "G_AI", "G_EQ", "G_EQm"]].to_csv(os.path.join(DATA, "fig13_overlap.csv"), index=False, encoding="utf-8-sig")
     draft_forest(forest, "fig10_robustness_forest")
     loud_png = os.path.join(RES, "paper_loudness.png")
     paper.fig_loudness(lp, loud_png)
@@ -755,10 +937,30 @@ def main():
         ex_f=str(ex_f), ex_g=str(ex_g), exf_ai=n(ex_gains[ex_f][0]), exg_ai=n(ex_gains[ex_g][0]),
         exf_eqm=n(ex_gains[ex_f][2]), exg_eqm=n(ex_gains[ex_g][2]), match_db=f"{MATCH_DB:.0f}", match_min=str(MATCH_MIN), fer_thr=f"{FER_THR:.0f}",
         v_h1=v(h1), v_h2=v(h2), v_h3="支持" if h3a and h3b else ("部分支持" if h3a else "不支持"), v_h4=v(rob_ok and rob[0.2][0] > 0),
-        rob_rng=esc(rob_rng), rob_wide_txt=esc(rob_wide_txt),
+        rob_rng=esc(rob_rng),
+        rob_wide_txt=(f"其中{esc(rob_wide_txt)}因可匹配枪声过少，CI 跨 0，单独不足以下结论。" if rob_wide
+                      else "各条件的 95\\% CI 均不跨 0，但有持续背景（"
+                           + str(next(r["n_matched"] for r in forest if r["name"].startswith("仅有持续背景")))
+                           + " 个可匹配枪声）等小子集的区间很宽。"),
+        n_ntc=str(len(nt_clean)), fer_special=p(c["fer_special"]), n_special=str(len(sp_b)), n_boost_clean=str(len(boosted_clean)),
+        fer_eqm=p(fer["EQm"]),
+        sp_txt="、".join(f"{sgn(r.G_AI)} dB" for r in sp_b.itertuples()),
+        fb_txt="；".join(f"{k} 个{SHORT[g]}（{'、'.join(n(x, 0, False) for x in fb[fb.group == g].raw_level)} dBFS，"
+                        f"{'、'.join(n(x) for x in fb[fb.group == g].G_AI)} dB）"
+                        for g, k in fb.group.value_counts().reindex(NT).dropna().astype(int).items()),
+        n_brv=str(n_brv), n_step=str(n_step), n_conf=str(n_conf), n_boost=str(int((nt_h.G_AI > FER_THR).sum())),
+        n_ov_boost=str(int((ov.G_AI > FER_THR).sum())), n_gap=str(gap["AI"][NT[0]][1]),
+        n_ut=str(int((d.group == NT[2]).sum())), n_ut_ov=str(int(ov.group.eq(NT[2]).sum())), n_gun=str(len(gun)),
+        n_ov=str(len(ov)), ov_comp=comp(ov), ov_ai=n(med(ov, "AI")), ov_eq=n(med(ov, "EQ")), g_nt=n(med(nt_clean, "AI")),
+        ov_lo_n=str(len(ov_lo)), ov_hi_n=str(len(ov_hi)), ov_lo_ai=n(med(ov_lo, "AI")), ov_hi_ai=n(med(ov_hi, "AI")),
+        ov_lo_lv=n(ov_lo.raw_level.median(), 0, False), ov_hi_lv=n(ov_hi.raw_level.median(), 0, False),
+        ov_lo_comp=comp(ov_lo), ov_hi_comp=comp(ov_hi),
+        n_decoy=str(n_decoy), n_opened=str(n_opened), blind_sens=p(c["blind_sens"]), brv_agree=str(c["brv_agree"]),
+        gb_txt=(lambda lo, hi: lo if lo == hi else f"{lo}～{hi}")(n(c["gun_boost_lv"].min(), 0, False), n(c["gun_boost_lv"].max(), 0, False)),
     )
+    V.update(prepare_pubg_nm_chapter())
     verdicts = (V["v_h1"], V["v_h2"], V["v_h3"], V["v_h4"])
-    if verdicts != ("支持", "支持", "部分支持", "支持"):
+    if verdicts != ("支持", "支持", "支持", "支持"):
         raise RuntimeError(f"hypothesis verdicts changed {verdicts}; update the summary text in TEMPLATE")
     body = TEMPLATE.replace("→", r"$\rightarrow$")
     for k, val in V.items():
@@ -803,6 +1005,7 @@ TEMPLATE = r"""\documentclass[11pt,a4paper]{ctexart}
 \ctexset{section={format=\Large\heiti\raggedright},subsection={format=\large\heiti\raggedright},
          subsubsection={format=\normalsize\heiti\raggedright}}
 \newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcommand{\hlai}[1]{\textbf{#1}}
 \renewcommand{\arraystretch}{1.18}
 \setlist{nosep,leftmargin=2em}
 \renewcommand{\topfraction}{0.9}\renewcommand{\bottomfraction}{0.8}\renewcommand{\textfraction}{0.07}
@@ -817,7 +1020,7 @@ TEMPLATE = r"""\documentclass[11pt,a4paper]{ctexart}
 \IfFileExists{figures/#1.png}{\includegraphics[width=#2]{figures/#1.png}}{%
 \fbox{\parbox[c][4.2cm][c]{#2}{\centering\small\color{gray}图位：\texttt{\detokenize{#1}}\\[2pt]按《图表需求说明》制作后放入 figures 目录}}}}
 \caption{#3}\label{fig:#4}\end{figure}}
-\newcommand{\keybox}[1]{\par\noindent\fcolorbox{black!45}{black!4}{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule}{#1}}\par}
+\newcommand{\keybox}[1]{\par\noindent{\parbox{\linewidth}{#1}}\par}
 
 \begin{document}
 \begin{titlepage}
@@ -852,7 +1055,7 @@ TEMPLATE = r"""\documentclass[11pt,a4paper]{ctexart}
 
 \keybox{\textbf{核心结论}：在本次 VALORANT 与 PUBG 真实游戏录音测试中，C3 实际 EQ 未增强脚步（中位 [[g_fo_eq]] dB），而 C3 FPS AI 对人工确认脚步的中位增强为 [[g_fo]] dB，同时枪声中位变化仅 [[g_gun]] dB。
 进一步将固定静态 EQ 调整至相同脚步增强水平后，枪声也会被提升约 [[g_gun_eqm]] dB，表明 FPS AI 的选择性无法由固定静态频响解释。
-与此同时，少量与脚步特征相近的安静瞬态声仍可能被同步增强，本次非脚步事件中约 [[fer]] 的增益超过 3 dB。
+与此同时，少量与脚步特征相近的安静瞬态声仍可能被同步增强：经原始轨盲审确认不含脚步的 [[n_ntc]] 个非脚步事件中，有 [[n_conf]] 个（[[fer]]）被误增强超过 3 dB；与脚步重叠的非脚步声随脚步一起被增强，属于正常。
 
 \medskip\textbf{主要发现}
 \begin{enumerate}
@@ -862,11 +1065,12 @@ TEMPLATE = r"""\documentclass[11pt,a4paper]{ctexart}
 \item \textbf{脚步增强有效（H1）}：人工确认脚步的增益中位数为 [[g_fo]] dB（95\% CI [[ci_lo]]～[[ci_hi]] dB，$n=[[n_fo]]$），[[ge3]] 不低于 3 dB；
 [[in_claim]] 落在宣称的 3--9 dB，[[gt9]] 超过 9 dB，中位数位于宣传区间上沿。
 \item \textbf{非目标声音保持（H3）}：枪声中位增益 [[g_gun]] dB，频谱变化（MSE [[mse_ai]] dB$^2$）显著低于实际 EQ（[[mse_eq]] dB$^2$）；含响亮声音的片段最大电平变化 [[dmax_loud]] dB。
-但约 [[fer]] 的非脚步瞬态（主要为远处安静枪声、换弹与道具声）被增强超过 3 dB。
+不含脚步的非脚步事件误增强率为 [[fer]]，低于 10\% 的工程阈值，也低于实际 EQ（[[fer_eq]]）；与脚步重叠的非脚步声随脚步一起被增强属于正常（\ref{sec:h3} 节）。
 \item \textbf{稳定性（H4）}：选择性趋势在 VALORANT 与 PUBG 两款计划评测游戏中均被观察到，并在不同纯净度、增益口径及 20\% 标签噪声扰动下方向一致。
 \item \textbf{边界}：脚步附近背景同步抬高约 [[pr_bg]] dB；以脚步为主的安静场景整体响度随之上升；本报告只验证声学处理效果。
+\item \textbf{模型更新（PUBG 环境音）}：针对官方“优化背景声误增强”口径，在同源 PUBG 素材上对比更新模型与主报告 FPS AI 轨（仅 PUBG；安静帧口径，与上文背景段 30\% 不同）——底噪误增强率由 [[nm_rate_o]] 降至 [[nm_rate_n]]，中位增益由 [[nm_med_o]] 降至 [[nm_med_n]] dB（详见 \ref{sec:nm_bg} 节）。
 \end{enumerate}
-综合判定：H1、H2、H4 \textbf{支持}，H3 \textbf{部分支持}；宣传册相关宣称的逐条核验见表~\ref{tab:claims}（支持 / 部分支持 / 未覆盖）。}
+综合判定：H1--H4 均\textbf{支持}；宣传册相关宣称的逐条核验见表~\ref{tab:claims}（支持 / 部分支持 / 未覆盖）。}
 
 \section{评测概述}
 \subsection{评测对象与产品宣称}
@@ -940,6 +1144,20 @@ Cohen $\kappa$ 衡量扣除随机一致之后的一致程度，一般认为 $\ka
 
 \input{tables/quality}
 
+\subsection{非脚步事件盲审}\label{sec:boostrv}
+增益分析完成后，为判断非脚步事件被增强时是否与脚步重叠，做了两步审核。第一步为非盲复核：对被 FPS AI 增强超过 3 dB 的 [[n_boost]] 个非脚步事件，对照三轨逐条复听，发现其中多数与脚步重叠。
+这一步只覆盖被增强的事件，且能听到处理后的音轨，结论可能偏向 FPS AI，因此不作为主结果。
+
+第二步为原始轨盲审（主结果）：将全部 [[n_nt]] 个人工确认非脚步事件与随机抽取的 [[n_decoy]] 个人工确认脚步（干扰项）随机打乱，只提供原始轨的事件片段与前后各 1.5 s 上下文，
+不显示类别、增益与编号，逐条判断“是否含有脚步”。页面允许在给出判断后收听 FPS AI 版本，但第一次判断随即锁定；只有 [[n_opened]] 个事件被打开过，主结果一律采用锁定前的判断。
+结果 [[n_step]] 个非脚步事件在事件区间内可听到脚步，即\textbf{与脚步重叠}（[[ov_comp]]）；其余事件不与脚步重叠。
+干扰脚步中 [[blind_sens]] 被正确判为含脚步，说明盲听条件下能可靠听出脚步。与第一步对照，[[n_brv]] 个被增强事件中 [[brv_agree]] 个结论一致。
+
+听到脚步不代表原标签有误：这些事件仍是枪声、换弹或道具声，只是与脚步同时出现，因此仍按原标签留在样本中，增益与同电平比较均不变。
+差别只在非目标声音的评价：FPS AI 的目标是增强脚步，与脚步重叠时非脚步声随脚步一起被抬高，反映的是对其中脚步的增强，属于正常；
+不含脚步的非脚步事件不应被增强，误增强率与非脚步频谱变化只在这 [[n_ntc]] 个事件上统计，FPS AI 与实际 EQ 按同一口径计算。
+另据品牌方说明，FPS AI 对吃药声有特化增强，吃药声被 FPS AI 增强不计为误增强。两类事件的增益表现见 \ref{sec:h3} 节，逐条结果见附录表~\ref{tab:boosted}。
+
 \section{标注模型}
 \subsection{设计约束}
 \begin{itemize}
@@ -1000,7 +1218,7 @@ S(t,f)=20\log_{10}\bigl(\lvert\mathrm{STFT}(x)\rvert(t,f)+\epsilon\bigr).\label{
 频谱 MSE & $\displaystyle \mathrm{MSE}=\frac{1}{TF}\sum_{t,f}\bigl[S_{\mathrm{proc}}(t,f)-S_{\mathrm{raw}}(t,f)\bigr]^2$ &
 频谱结构变化（dB$^2$），越小越接近原声；分“总”与“形状”两种口径 \\
 误增强率 FER & $\displaystyle \mathrm{FER}=\frac{N\bigl(G_{\text{非脚步}}>[[fer_thr]]\,\mathrm{dB}\bigr)}{N_{\text{非脚步}}}$ &
-非脚步事件被误增强的比例；阈值即宣称的最低脚步增益 \\
+不含脚步的非脚步事件被误增强的比例（\ref{sec:boostrv} 节）；阈值即宣称的最低脚步增益 \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -1051,7 +1269,8 @@ S(t,f)=20\log_{10}\bigl(\lvert\mathrm{STFT}(x)\rvert(t,f)+\epsilon\bigr).\label{
 本节回答产品层面的问题：用户直接开启 C3 的实际 EQ 与开启 FPS AI，表现有何区别（表~\ref{tab:product}，表~\ref{tab:gain_cls}，图~\ref{fig:bars}）。
 实际 EQ 对脚步的中位增益为 [[g_fo_eq]] dB，对枪声为 [[g_gun_eq]] dB，即基本不增强任何类别；FPS AI 对脚步为 [[g_fo]] dB，对枪声仅 [[g_gun]] dB。
 两种产品模式的作用逻辑完全不同：实际 EQ 是作用于全部声音的固定频响调整，FPS AI 则主要增强脚步。
-在非目标声音上，FPS AI 的误增强率（[[fer]]）与实际 EQ（[[fer_eq]]）相近，枪声频谱变化则小于实际 EQ（\ref{sec:h3} 节）。
+在非目标声音上，不含脚步的非脚步事件中 FPS AI 的误增强率为 [[fer]]，低于实际 EQ（[[fer_eq]]）。
+枪声频谱变化则明显小于实际 EQ（\ref{sec:h3} 节）。
 
 \input{tables/product}
 \input{tables/gain_cls}
@@ -1071,7 +1290,7 @@ $-35$ dBFS 以上的脚步仅 [[n_hi]] 个、来自 [[n_hiclip]] 个片段，增
 显著削弱了“只是对响声增强少”这一简单解释（$\pm$[[match_db]] dB 匹配可控制一阶响度影响，但不能排除所有与电平相关的非线性行为）；匹配静态 EQ 的同电平差仅 [[g_eqm]] dB，即脚步增益相同的固定 EQ 会同步抬高枪声（[[g_gun_eqm]] dB），因此观察到的选择性无法由固定静态频响解释。
 脚步 [[g_fo]]、枪声 [[g_gun]]、同电平差 [[gap_gun]]、匹配静态 EQ [[g_eqm]] dB 相互印证，是本报告技术层面最核心的发现。
 作为汇总描述，SEI 为 [[sei_ai]] dB，实际 EQ 与匹配静态 EQ 分别为 [[sei_eq]] 与 [[sei_eqm]] dB。
-例外是烟雾弹、吃药声与爆能器一类（[[gap_ut]] dB，仅 [[n_ut_gap]] 个可匹配），受到的增强不低于同电平脚步。
+烟雾弹、吃药声与爆能器一类的同电平差为 [[gap_ut]] dB，但仅 [[n_ut]] 个事件（[[n_ut_gap]] 个可匹配），且其中 [[n_ut_ov]] 个与脚步重叠，不作结论。
 
 图~\ref{fig:wave} 与图~\ref{fig:spec} 以一个典型脚步与一个响亮枪声为例对比四种处理。
 波形上，FPS AI 将脚步放大 [[exf_ai]] dB，枪声基本不变（[[exg_ai]] dB）；匹配静态 EQ 对脚步的增益相近（[[exf_eqm]] dB），却同时把枪声抬高 [[exg_eqm]] dB；实际 EQ 对两者均略有衰减。
@@ -1083,21 +1302,26 @@ FPS AI 对脚步的增强集中在起振段与 2 kHz 以下，后段高频略有
 \figslot{fig12_spectrograms}{\linewidth}{典型事件的原始声谱与差分声谱（上：脚步 \#[[ex_f]]；下：枪声 \#[[ex_g]]）。差分声谱为处理后减原始，红色为增强、蓝色为衰减，灰色为原始能量低于峰值 60 dB 的区域；标签为事件增益}{spec}
 
 \subsection{H3 非目标声音保持性}\label{sec:h3}
-本节检验 FPS AI 能否在增强脚步的同时较好保持主要非目标声音。枪声的频谱总变化（MSE）为 [[mse_ai]] dB$^2$，约为实际 EQ（[[mse_eq]] dB$^2$）的 [[mse_ratio]]（约 1/[[mse_frac]]）；
-扣除整体电平差后，枪声的频谱形状变化为 [[mse_gs_ai]] dB$^2$，也显著小于实际 EQ（[[mse_gs_eq]] dB$^2$，约 1/[[mse_sfrac]]）（表~\ref{tab:mse}）。
-非脚步 FER 为 [[fer]]，枪声为 [[fer_g]]（表~\ref{tab:fer}，图~\ref{fig:fer}），高于 10\% 的判定线。该线是本报告设定的工程容忍阈值（约每 10 个非脚步事件允许 1 个被明显增强），并非行业标准；H3 判为部分支持主要源于这一点。
-被误增强的事件电平低、与脚步相近：[[n_boost_gun]] 个被增强的枪声位于 [[gb_lo]]～[[gb_hi]] dBFS，均为远处枪声，近处响亮枪声无一被增强；且集中在少数片段（附录表~\ref{tab:boosted}）。
-FPS AI 对脚步本身的频谱形状改变（[[mse_fo_shape]] dB$^2$）高于实际 EQ（[[mse_fo_shape_eq]] dB$^2$），这符合其主动增强目标，但是否影响材质、距离等感知需要主观实验。
-结论为\textbf{部分支持}：对响亮枪声保持较好，但对部分安静瞬态、换弹和道具声存在误增强。
+本节检验 FPS AI 增强脚步时是否保持非目标声音。按事件中是否含有脚步，期望的处理不同（表~\ref{tab:overlap}，图~\ref{fig:overlap}）：
+脚步是增强目标（H1）；与脚步重叠的非脚步事件中含有脚步，随脚步一起被增强属于正常；不含脚步的非脚步事件不应被增强，被增强超过 3 dB 即为误增强。是否含脚步由只听原始轨的非脚步盲审判定（\ref{sec:boostrv} 节）。
 
+结果符合这一预期。与脚步重叠的 [[n_ov]] 个事件中位增益为 [[ov_ai]] dB：安静的 [[ov_hi_n]] 个随脚步一起被抬高（中位 [[ov_hi_ai]] dB），以响亮枪声为主的 [[ov_lo_n]] 个几乎不变（中位 [[ov_lo_ai]] dB）。
+不含脚步的 [[n_ntc]] 个非脚步事件中位增益仅 [[g_nt]] dB，其中 [[n_boost_clean]] 个超过 3 dB：吃药声 [[n_special]] 个（[[sp_txt]]），据品牌方说明属 FPS AI 的特化增强，不计为误增强；
+其余 [[n_conf]] 个为误增强，即 [[fb_txt]]，均为与脚步电平相近的安静声音，近处响亮枪声无一被增强（附录表~\ref{tab:boosted}）。
+误增强率 FER 为 [[fer]]（[[n_conf]] / [[n_ntc]]），低于 10\% 的判定线，也低于实际 EQ（[[fer_eq]]），匹配静态 EQ 为 [[fer_eqm]]；若吃药声也计为误增强，FER 为 [[fer_special]]。各类别误增强率与阈值敏感性见附录表~\ref{tab:fer} 与图~\ref{fig:fer}。
+
+音色方面，不含脚步的枪声频谱总变化为 [[mse_ai]] dB$^2$，约为实际 EQ（[[mse_eq]] dB$^2$）的 1/[[mse_frac]]；扣除整体电平差后的形状变化为 [[mse_gs_ai]] dB$^2$，约为实际 EQ（[[mse_gs_eq]] dB$^2$）的 1/[[mse_sfrac]]（表~\ref{tab:mse}）。
+FPS AI 对脚步本身的频谱形状改变（[[mse_fo_shape]] dB$^2$）高于实际 EQ（[[mse_fo_shape_eq]] dB$^2$），这符合其主动增强目标，但是否影响材质、距离等感知需要主观实验。
+结论为\textbf{支持}。
+
+\input{tables/overlap}
+\figslot{fig13_overlap}{0.85\linewidth}{FPS AI 增益与原始电平：脚步、与脚步重叠和不含脚步的非脚步事件（点线为 3 dB）}{overlap}
 \input{tables/mse}
-\input{tables/fer}
-\figslot{fig09_fer_curve}{0.95\linewidth}{误增强率随判定阈值的变化（点线为本报告阈值 3 dB；匹配静态 EQ 为机制性辅助对照）}{fer}
 
 \subsection{H4 稳定性}\label{sec:robust}
 H4 检验在不同目标游戏、事件纯净度、增益计算口径及合理标签噪声扰动下，核心选择性效应的方向是否稳定。
 在上述条件下，同电平 $\Delta G$ 的点估计均为正（[[rob_rng]] dB，表~\ref{tab:robust}，图~\ref{fig:forest}），效应方向不变；
-其中[[rob_wide_txt]]因可匹配枪声过少，CI 跨 0，单独不足以下结论。标注噪声模拟中（[[rob_n]] 条明确标注），选择性效应为 [[rob_base]] dB，
+[[rob_wide_txt]]标注噪声模拟中（[[rob_n]] 条明确标注），选择性效应为 [[rob_base]] dB，
 随机翻转 10\% 与 20\% 标注后分别为 [[rob10]] 与 [[rob20]] dB；需刻意挑错 [[rob_worst]] 条（[[rob_worst_p]]）才能抹平效应，远超盲审反映的不一致水平（[[disagree]]）。
 两款目标游戏的增强幅度不同（脚步：PUBG [[g_pubg]] dB，VALORANT [[g_val]] dB），但都呈现脚步明显增强、枪声中位变化较小（[[gun_pubg]] / [[gun_val]] dB）的模式（表~\ref{tab:game}）。
 两款游戏的一致结果不构成对其他游戏的泛化结论。
@@ -1128,7 +1352,7 @@ H4 检验在不同目标游戏、事件纯净度、增益计算口径及合理�
 在产品层面，C3 实际 EQ 对脚步与枪声分别为 [[g_fo_eq]] / [[g_gun_eq]] dB，FPS AI 为 [[g_fo]] / [[g_gun]] dB：用户可用的两种模式中，只有 FPS AI 显著增强脚步。
 在技术层面，核心发现为 H2 事件选择性。最具区分力的证据是匹配静态 EQ 对照：当固定静态 EQ 对脚步取得与 FPS AI 相同的增益时，枪声与背景段也被同步抬高（[[g_gun_eqm]] / [[g_bg_eqm]] dB），
 而 FPS AI 对枪声的中位增益为 [[g_gun]] dB。观察到的选择性无法由固定静态频响解释，表现出明显的事件选择性处理特征；本实验从输出行为描述这一差异，不直接推断设备内部的识别机制。
-H1 中脚步增强效果明确，但增益分布与 3--9 dB 区间仅部分重合（描述性结果，不影响判定）。H3 为部分支持，其边界见 \ref{sec:bound} 节。
+H1 中脚步增强效果明确，但增益分布与 3--9 dB 区间仅部分重合（描述性结果，不影响判定）。H3 判为支持，其边界见 \ref{sec:bound} 节。
 
 \subsection{宣传册宣称逐条核验}
 \input{tables/claims}
@@ -1137,7 +1361,8 @@ H1 中脚步增强效果明确，但增益分布与 3--9 dB 区间仅部分重�
 
 \subsection{适用边界}\label{sec:bound}
 \begin{enumerate}
-\item 误增强集中在电平与脚步相近的安静瞬态（远处枪声、换弹、烟雾弹、吃药声）；
+\item 确认的误增强为电平与脚步相近的安静瞬态（远处枪声、换弹、吃药声）；
+\item 脚步与安静的非脚步声重叠时，重叠的声音会随脚步一起被增强；与响亮枪声重叠时，枪声基本不受影响（\ref{sec:h3} 节）；
 \item 增强脚步时紧邻背景同步抬高约 [[pr_bg]] dB，有效突出度（[[pr_c]] dB）小于峰值增益（[[pr_peak]] dB）；
 \item 脚步音色被改变，是否影响材质与距离判断需主观实验确认；
 \item 安静场景整体响度随脚步上升（Lmax 中位 [[dmax_quiet]] dB）；
@@ -1145,21 +1370,55 @@ H1 中脚步增强效果明确，但增益分布与 3--9 dB 区间仅部分重�
 \item 结论限于 VALORANT 与 PUBG 两款目标游戏，且只验证声学处理效果，不等价于证明玩家定位能力提升。
 \end{enumerate}
 
+\section{模型更新：环境音误增强改善（PUBG）}\label{sec:nm_bg}
+主报告正文中的 FPS AI 轨对应评测当时交付的旧模型。品牌方随后提供了更新模型（\texttt{pubg\_output\_newmodel}），官方主口径为\textbf{优化背景声 / 环境音的误增强}。
+本节为独立补充分析：事件边界、人工标注与盲审沿用主报告，仅更换 PUBG 的模型处理轨，并与旧 FPS AI 轨对照；不改动上文 H1--H4 的主结论数字。
+
+\subsection{测量口径}
+前文「背景段误增强率 30\%」是对 VALORANT 与 PUBG \textbf{全部}背景段、按\textbf{整段 RMS}超过 3 dB 的比例。
+本节只评 PUBG、且改以段内\textbf{安静帧}（短时电平 $<-65$ dBFS）的中位增益衡量真正底噪——因为部分空隙里夹着未检出的短促响声，整段 RMS 会被峰值拉高，不宜直接当环境底噪。
+超过 3 dB 记为底噪误增强。因此本节的 [[nm_rate_o]] 与上文 30\% \textbf{不是同一指标}，不可直接对照。
+
+\subsection{主结果}
+\input{tables/nm_bg_summary}
+在 PUBG 的 [[nm_n_bg]] 段背景空隙上，安静帧口径下底噪误增强率由 [[nm_rate_o]] 降至 [[nm_rate_n]]，中位增益由 [[nm_med_o]] 降至 [[nm_med_n]] dB（$\Delta$ [[nm_d_med]] dB）。
+例如 test14 整段新旧增益均约 $+14$ dB（空隙内有短促响声），但安静帧中位由约 [[nm_ex_b_zo]] 压至 [[nm_ex_b_zn]] dB，说明抬高主要来自那些响声而非平稳底噪。
+
+\figslot{fig_nm_bg_claim}{0.88\linewidth}{PUBG 新旧模型：底噪误增强率与中位增益（安静帧口径）}{nmclaim}
+
+\subsection{样例波形}
+旧模型有两段背景空隙整段增益超过 3 dB（test4、test14）。图~\ref{fig:nmex} 对每一段给出原始 / 旧模型 / 新模型横排对比，并放大安静窗口。
+样例 A（test4）整段增益由 [[nm_ex_a_o]] 降至 [[nm_ex_a_n]] dB，误增强消除；样例 B（test14）整段仍高（空隙内有短促响声），但放大镜内底噪已压下。
+
+\figslot{fig_nm_bg_examples}{0.98\linewidth}{两处旧模型误增强样例：上排横排整段；下排安静段放大镜（列对齐、同纵轴）}{nmex}
+
+\subsection{其他能力是否明显削弱}
+环境音压低不应以牺牲脚步增强为代价。表~\ref{tab:nm_other} 为 PUBG 子集上的快检：脚步中位由 [[nm_fo_o]] 升至 [[nm_fo_n]] dB（未削弱）；
+事件 FER 由 [[nm_fer_o]] 变为 [[nm_fer_n]]、纯净枪声频谱 MSE 由 [[nm_mse_o]] 变为 [[nm_mse_n]] dB$^2$，属有限回退。
+\input{tables/nm_other}
+
+综合：在官方“少抬环境底噪”口径下，PUBG 安静帧证据\textbf{支持}新模型改善；主能力未见明显削弱。完整试听与独立短报告见项目 \texttt{docs/} 目录下的 PUBG 新旧模型对比 HTML / PDF。
+
 \section{局限与后续工作}\label{sec:limit}
 \begin{itemize}
 \item 数据由品牌方提供，片段的截取规则、对局数量与录制设置无法独立核实；若截取时偏向特定场景，结论只代表这类场景；
 \item 候选事件由原始轨频谱通量自动检测，缺少逐帧完整真值，因此候选检测的召回率无法直接评估，部分极弱、起振不明显或被背景掩盖的事件可能未进入后续分析。
 三轨使用相同的候选时间点，这不影响三种处理之间的比较，但限制了结果对“全部游戏脚步”的代表性；
-\item 数据来自真实对局且无分轨；人工确认的非脚步事件仅 [[n_nt]] 个，PUBG 枪声仅 [[n_gun_pubg]] 个，缺少爆炸、装拆包、技能声等类别；
+\item 数据来自真实对局且无分轨；人工确认的非脚步事件仅 [[n_nt]] 个（其中 [[n_step]] 个与脚步重叠），PUBG 枪声仅 [[n_gun_pubg]] 个，烟雾弹/吃药/爆能器仅 [[n_ut]] 个，缺少爆炸、装拆包、技能声等类别；
+\item 非脚步盲审在增益分析之后进行，由同一名标注者完成，且该标注者此前在非盲复核中听过其中 [[n_boost]] 个被增强事件的 FPS AI 版本；干扰脚步检出率 [[blind_sens]] 说明盲听判断可靠，但不能替代第二名标注者的独立判断。H3 的判定依赖这次盲审对是否含脚步的判断；吃药声的特化增强依据品牌方说明，样本仅 [[n_special]] 例，本报告无法独立验证；
 \item 仅一名标注者，盲审证明的是稳定性而非绝对准确性；事件终点为自动估计；
 \item 宣传册中的处理延迟（40 ms）无法用离线录音检验；
-\item 本报告只评价声学效果，增强能否提升玩家的脚步检测与定位表现需主观听辨实验验证。
+\item 本报告只评价声学效果，增强能否提升玩家的脚步检测与定位表现需主观听辨实验验证；
+\item \ref{sec:nm_bg} 节的新模型结论仅基于 PUBG（背景空隙 [[nm_n_bg]] 段），未覆盖 VALORANT；安静帧口径与上文背景段整段 RMS 口径不同，样本亦偏少，外推需谨慎。
 \end{itemize}
-后续建议：在训练场受控录制分类别、分距离素材以获得天然真值并补齐响亮脚步与爆炸声；引入第二名标注者；开展双盲主观听辨实验。
+后续建议：由第二名标注者独立完成非脚步盲审与部分事件标注；在训练场受控录制分类别、分距离素材以获得天然真值并补齐响亮脚步与爆炸声；开展双盲主观听辨实验；若产品全面切换新模型，建议在 VALORANT 上复验环境音口径。
 
+\clearpage
 \appendix
-\section{误增强事件清单}
+\section{误增强补充材料}
 \input{tables/boosted}
+\input{tables/fer}
+\figslot{fig09_fer_curve}{0.95\linewidth}{不含脚步的非脚步事件与背景段的误增强率随判定阈值的变化（点线为本报告阈值 3 dB；匹配静态 EQ 为机制性辅助对照）}{fer}
 
 \section{机器可识别性的探索性分析}
 \textbf{鉴于候选检测器在原始游戏音频上的识别能力不足，本报告不使用机器可检测性作为 FPS AI 效果证据。}本附录作为负结果保留，供方法审查参考。
@@ -1179,6 +1438,7 @@ H1 中脚步增强效果明确，但增益分布与 3--9 dB 区间仅部分重�
 \item \texttt{extract\_clean.py}：导出三轨纯净事件库；
 \item \texttt{report\_ad.py}：同电平对比与匹配静态 EQ；
 \item \texttt{detectability.py}、\texttt{finetune\_panns.py}：附录 B 的探索性分析；
+\item \texttt{compare\_pubg\_newmodel.py}、\texttt{report\_pubg\_newmodel.py}：PUBG 新旧模型环境音补充（\ref{sec:nm_bg} 节）；
 \item \texttt{report\_tex.py}：生成本报告的全部表格、图表数据与草图并编译。
 \end{enumerate}
 图表数据位于 \texttt{docs/report\_tex/figures/data/}；三轨纯净事件库位于 \texttt{analysis/clean\_events/}（[[n_clean]] 个事件）；

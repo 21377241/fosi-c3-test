@@ -1,14 +1,19 @@
 # 品牌方提供的原始三轨音频（不公开）
 fps_test/
+pubg_output_newmodel.zip
+pubg_output_newmodel/
 
 # 由原始音频派生的文件：嵌入缓存与模型权重、事件音频片段、草图
 analysis/cache/
 analysis/clean_events/**/*.wav
 analysis/labeling/snippets/
 analysis/figs/
+analysis/listen_boosted/
+analysis/误增强事件试听.html
 analysis/results/*.png
 analysis/results/*.html
 analysis/results/*.log
+analysis/results/_pdf_extract/
 
 # 宣传册与生成的报告（PDF / HTML）
 docs/*.pdf
@@ -24,3 +29,4 @@ docs/report_tex/*.pdf
 # Python
 __pycache__/
 *.pyc
+analysis/原始轨盲审.html

@@ -1,0 +1,16 @@
+\begin{table}[htbp]\centering
+\caption{产品向主对比：旧模型 vs 新模型（新模型优胜单元格加粗）}\label{tab:nm_product}
+{\small\begin{threeparttable}
+\begin{tabularx}{\linewidth}{Lcccc}\toprule
+指标 & 旧模型 & 新模型 & $\Delta$（新$-$旧） & 实际 EQ \\
+\midrule
+脚步中位增益（dB） & $+$11.8 & \textbf{$+$12.3} & \textcolor{good}{\textbf{$+$0.5}} & $+$0.8 \\
+脚步 $\geq$ 3 dB & 93\% & 92\% & \textcolor{bad}{\textbf{$-$1.4}} & 1\% \\
+不含脚步的枪声（dB） & 0.0 & $+$0.1 & 0.0 & $+$3.1 \\
+不含脚步的非脚步中位（dB） & $+$0.1 & $+$0.1 & 0.0 & $+$2.3 \\
+不含脚步的非脚步 FER & 7\% & 11\% & \textcolor{bad}{\textbf{$+$3.7}} & 44\% \\
+纯净枪声 MSE（dB$^{2}$） & 2.0 & 3.3 & \textcolor{bad}{\textbf{$+$1.4}} & 8.0 \\
+背景段中位（dB） & 0.0 & $-$0.1 & \textcolor{bad}{\textbf{$+$0.1}} & $-$0.2 \\
+\bottomrule\end{tabularx}
+\begin{tablenotes}\footnotesize\item 加粗：新模型在该指标方向上优于旧模型。\item 实际 EQ 列为参照，不是本报告的比较对象。\end{tablenotes}\end{threeparttable}}
+\end{table}

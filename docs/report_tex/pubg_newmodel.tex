@@ -1,0 +1,92 @@
+\documentclass[11pt,a4paper]{ctexart}
+\usepackage[top=25mm,bottom=25mm,left=24mm,right=24mm]{geometry}
+\usepackage{graphicx,booktabs,threeparttable,makecell,multirow,tabularx,array,enumitem,amsmath,amssymb,xcolor,float,fancyhdr,lastpage}
+\usepackage[section]{placeins}
+\usepackage{etoolbox}
+\pretocmd{\subsection}{\FloatBarrier}{}{}
+\usepackage[font=small,labelfont=bf,labelsep=quad,skip=4pt]{caption}
+\usepackage[colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue]{hyperref}
+\setmainfont{Times New Roman}
+\setsansfont{Arial}
+\ctexset{section={format=\Large\heiti\raggedright},subsection={format=\large\heiti\raggedright},
+         subsubsection={format=\normalsize\heiti\raggedright}}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcommand{\hlai}[1]{\textbf{#1}}
+\renewcommand{\arraystretch}{1.18}
+\setlist{nosep,leftmargin=2em}
+\renewcommand{\topfraction}{0.9}\renewcommand{\bottomfraction}{0.8}\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.8}\setcounter{topnumber}{3}\setcounter{totalnumber}{5}
+\setlength{\emergencystretch}{2em}
+\pagestyle{fancy}\fancyhf{}
+\lhead{\small PUBG FPS AI 新旧模型对比（背景专项）}\rhead{\small 第 \thepage\ 页 / 共 \pageref{LastPage} 页}
+\renewcommand{\headrulewidth}{0.4pt}
+\newcommand{\figslot}[4]{%
+\begin{figure}[htbp]\centering
+\IfFileExists{figures/#1.pdf}{\includegraphics[width=#2]{figures/#1.pdf}}{%
+\IfFileExists{figures/#1.png}{\includegraphics[width=#2]{figures/#1.png}}{%
+\fbox{\parbox[c][4.2cm][c]{#2}{\centering\small\color{gray}图位：\texttt{\detokenize{#1}}\\[2pt]按《图表需求说明》制作后放入 figures 目录}}}}
+\caption{#3}\label{fig:#4}\end{figure}}
+\newcommand{\keybox}[1]{\par\noindent\fcolorbox{black!45}{black!4}{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule}{#1}}\par}
+
+
+\definecolor{ai}{HTML}{1F4E79}
+\newcommand{\tagbox}[1]{\colorbox{ai!10}{\strut\heiti\color{ai}\ #1\ }}
+\newcommand{\greybox}[1]{\par\noindent\colorbox{black!6}{\parbox{\dimexpr\linewidth-2\fboxsep}{\small #1}}\par}
+\newcommand{\bignum}[2]{\parbox[t]{0.24\linewidth}{\centering{\fontsize{17}{20}\selectfont\heiti\color{ai}#1}\\[2pt]{\scriptsize #2}}}
+
+\begin{document}
+\begin{titlepage}
+\centering\vspace*{40mm}
+{\Huge\heiti PUBG FPS AI\par}\vspace{6pt}
+{\huge\heiti 新旧模型对比\par}
+\vspace{8mm}
+{\Large 背景声误增强 · 专项简报\par}
+\vspace{18mm}
+\begin{tabular}{rl}
+官方主口径： & 优化背景声的误增强\\
+范围： & PUBG 15 段；背景空隙 6 段\\
+对照： & 旧 FPS AI vs 新模型（同源原始轨）\\
+版本： & v2.0\quad 2026 年 10 月\\
+\end{tabular}
+\vfill
+{\small 独立补充；不改动主报告结论。\par}
+\end{titlepage}
+
+\section{结论}
+\keybox{\textbf{支持：真正底噪上的误增强已压到阈值以下}\\[4pt]
+以段内安静帧（短时电平 $<-65$\,dBFS）衡量底噪：误增强率 17\%$\rightarrow$0\%；
+中位增益 $-0.1$$\rightarrow$$-3.5$\,dB。\\[2pt]
+\textbf{其他能力：}主能力（脚步增强/枪声保持）未明显削弱；事件 FER 与枪声音色有回退}
+
+\begin{center}
+\bignum{17\%$\rightarrow$0\%}{底噪误增强率}\\%
+\bignum{$-0.1$$\rightarrow$$-3.5$}{底噪中位增益（dB）}\\%
+\bignum{$+11.8$$\rightarrow$$+12.3$}{脚步中位（dB）}\\%
+\bignum{7\%$\rightarrow$11\%}{事件 FER}
+\end{center}
+
+\vspace{2mm}
+\input{tables/nm_bg_summary}
+
+\section{证据：两处误增强样例}
+旧模型有两段背景空隙增益超过 3\,dB（test4、test14）。下图对每一段：\textbf{上排}原始 / 旧模型 / 新模型横排（同一行同纵轴，整段振幅一眼可比）；\textbf{下排}由蓝框安静区分别引出放大镜，细看底噪。
+
+\figslot{fig_nm_bg_examples}{0.98\linewidth}{上排横排整段对比；下排各轨放大镜。样例 A（test4）整段误增强已消除；样例 B（test14）含突发声，放大镜内底噪已压下}{nmbgex}
+
+\figslot{fig_nm_bg_claim}{0.88\linewidth}{汇总：底噪误增强率与中位增益（安静帧口径）}{nmbg}
+
+\greybox{样例 A：整段旧 $+3.8$$\rightarrow$新 $-0.5$\,dB。
+样例 B：整段 RMS 仍高（旧 $+13.3$ / 新 $+14.0$），因夹带脚步类突发声；放大镜安静段旧 $+6.1$$\rightarrow$新 $+1.0$\,dB，底噪已压下。}
+
+\section{其他能力有没有明显削弱？}
+\input{tables/nm_other}
+
+\greybox{脚步与同电平选择性略升或持平，不属于削弱。事件 FER、枪声频谱 MSE 变差，属于连带代价，幅度有限、样本也偏少，不宜写成“能力全面变差”。}
+
+\section{一句话}
+\keybox{新模型在 PUBG 上\textbf{兑现了“少抬底噪”}；脚步增强未削弱。
+事件级误增强与枪声音色有一定回退，但不构成主能力全面变差——若验收只盯背景口径，可以过；若同时卡 FER/音色，需另议。}
+
+\vspace{6mm}
+{\small 复现：\texttt{python analysis/report\_pubg\_newmodel.py}\par}
+\end{document}

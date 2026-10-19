@@ -45,6 +45,19 @@ def pct(x):
     return f"{x:.0%}"
 
 
+SPECIAL = {"吃药声"}  # FPS AI enhances these on purpose (per the brand), so their FPS AI boosts are not false boosts
+
+
+def fer_rate(x, p="AI", thr=FER_THR):
+    """Share of footstep-free events (step_ov False) boosted above thr, excluding FPS AI boosts of SPECIAL sounds."""
+    if "step_ov" in x:
+        x = x[~x["step_ov"]]
+    hit = x[f"G_{p}"] > thr
+    if p == "AI" and "special" in x:
+        hit &= ~x["special"]
+    return hit.mean()
+
+
 def sgn(x, nd=1):
     s = f"{x:+.{nd}f}"
     return s[1:] if float(s) == 0 else s
@@ -283,6 +296,20 @@ def detect_summary():
 
 def main():
     d, bg, dm, ev, meta, clips, rv, r2, r3, r4 = load()
+    # after the gain analysis: unblinded review of the boosted non-footsteps (boosted_review.csv), then a raw-only blind
+    # re-review of all non-footsteps plus decoy footsteps (blind_review_r5.csv); events heard to contain footsteps stay in
+    # the sample, but FER and the non-footstep spectral MSE use only the footstep-free ones
+    brv = pd.read_csv(os.path.join(LAB, "boosted_review.csv"), encoding="utf-8-sig", keep_default_na=False)
+    blind = pd.read_csv(os.path.join(LAB, "blind_r5_key.csv"), encoding="utf-8-sig").merge(
+        pd.read_csv(os.path.join(LAB, "blind_review_r5.csv"), encoding="utf-8-sig", keep_default_na=False)
+        .rename(columns={"序号": "idx", "判断_原始轨": "盲审判断"}), on="idx")
+    has_step = set(blind.loc[blind.group.isin(NT) & (blind["盲审判断"] != "无脚步"), "event_id"])
+    decoy = blind[blind.group == FOOT]
+    blind_sens = (decoy["盲审判断"] == "含脚步").mean()
+    brv = brv.merge(blind[["event_id", "盲审判断"]], on="event_id", how="left")
+    brv_agree = int(((brv["是否误增强"] == "不是误增强") == (brv["盲审判断"] == "含脚步")).sum())
+    d = d.assign(step_ov=d.event_id.isin(has_step),
+                 special=d.event_id.isin(meta.loc[meta.note.isin(SPECIAL), "event_id"]))
     r3_loud = r3[r3.purpose == "loud_check"]
     r3_amb = r3[r3.purpose == "ambiguous"]
     r3_def = r3_amb[r3_amb.human_label.isin(["f", "g", "o"])]
@@ -323,10 +350,13 @@ def main():
     gap_m = {p: matched_gap(fo_h, nt_m, p) for p in ["AI", "EQ"]}
     med = lambda x, p: x[f"G_{p}"].median()
     sei = {p: med(fo_h, p) - np.mean([med(d[d.group == g], p) for g in NT]) for p in ["AI", "EQ", "EQm"]}
-    fer = {p: (nt_h[f"G_{p}"] > FER_THR).mean() for p in ["AI", "EQ", "EQm"]}
-    fer_g = {p: (d.loc[d.group == NT[0], f"G_{p}"] > FER_THR).mean() for p in ["AI", "EQ", "EQm"]}
-    fer_bg = {p: (bg[f"G_{p}"] > FER_THR).mean() for p in ["AI", "EQ", "EQm"]}
-    mse = lambda g, c: d.loc[d.group == g, c].median()
+    fer = {p: fer_rate(nt_h, p) for p in ["AI", "EQ", "EQm"]}
+    fer_g = {p: fer_rate(d[d.group == NT[0]], p) for p in ["AI", "EQ", "EQm"]}
+    fer_bg = {p: fer_rate(bg, p) for p in ["AI", "EQ", "EQm"]}
+    ov = nt_h[nt_h.step_ov]
+    nt_clean = nt_h[~nt_h.step_ov]
+    fer_special = (nt_clean.G_AI > FER_THR).mean()
+    mse = lambda g, c: d.loc[(d.group == g) & ~d.step_ov, c].median()
     lvl_hi = fo_all[fo_all.raw_level > -35]
     lvl_mid = fo_all[fo_all.raw_level.between(-40, -35)]
     lvl_lo = fo_all[fo_all.raw_level < -40]
@@ -371,10 +401,12 @@ def main():
     fa_g = lambda g, p: med(fo_all[fo_all.game == g], p)
 
     # boosted non-footsteps, listed one by one
-    boosted = nt_h[nt_h.G_AI > FER_THR].merge(meta[["event_id", "note", "game", "clip_id", "t"]], on="event_id", suffixes=("", "_m"))
+    boosted = nt_h[nt_h.G_AI > FER_THR].merge(meta[["event_id", "note", "game", "clip_id", "t"]], on="event_id", suffixes=("", "_m")) \
+        .merge(brv[["event_id", "是否误增强", "原因备注", "盲审判断"]], on="event_id", how="left")
     boosted_rows = [{"类别": SHORT[r.group], "备注": r.note or "—", "片段": f"{r.game_m.upper()} test{r.clip_id}",
                      "时间 (s)": f"{r.t:.1f}", "原始电平": f"{r.raw_level:.0f} dBFS", "FPS AI 增益": sgn(r.G_AI),
-                     "EQ 增益": sgn(r.G_EQ)} for r in boosted.sort_values(["group", "game_m", "clip_id", "t"]).itertuples()]
+                     "EQ 增益": sgn(r.G_EQ), "复核结论": r.是否误增强, "复核说明": r.原因备注, "盲审判断": r.盲审判断}
+                    for r in boosted.sort_values(["group", "game_m", "clip_id", "t"]).itertuples()]
 
     cnt = d.groupby(["group", "purity"]).size().unstack(fill_value=0)
     cnt_rows = [{"类别": SHORT[g], "纯净": int(cnt.loc[g].get("p", 0)), "有持续背景": int(cnt.loc[g].get("b", 0)),
@@ -389,8 +421,9 @@ def main():
                       "FPS AI": sgn(med(bg, "AI")), "EQ（实际）": sgn(med(bg, "EQ")), "匹配静态 EQ（模拟）": sgn(med(bg, "EQm"))})
 
     boost_max = nt_h.G_AI.max()
-    n_boost_gun = int(((d.group == NT[0]) & (d.G_AI > FER_THR)).sum())
-    gun_boost_lv = d.loc[(d.group == NT[0]) & (d.G_AI > FER_THR), "raw_level"]
+    gun_fb = (d.group == NT[0]) & (d.G_AI > FER_THR) & ~d.step_ov & ~d.special
+    n_boost_gun = int(gun_fb.sum())
+    gun_boost_lv = d.loc[gun_fb, "raw_level"]
     gap_rows = [{"非脚步类别": SHORT[g], "可匹配事件数": gap["AI"][g][1],
                  **{lab: f"<b>{sgn(gap[p][g][0])}</b>" if p == "AI" else sgn(gap[p][g][0])
                     for p, lab in [("AI", "FPS AI"), ("EQ", "EQ（实际）"), ("EQm", "匹配静态 EQ")]}} for g in NT]

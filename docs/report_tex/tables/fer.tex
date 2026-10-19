@@ -1,14 +1,14 @@
 \begin{table}[htbp]\centering
-\caption{误增强率（增益 > 3 dB 的比例）}\label{tab:fer}
+\caption{各类别误增强率（增益 > 3 dB 的比例）}\label{tab:fer}
 {\small\begin{threeparttable}
 \begin{tabular}{lcccc}\toprule
 类别 & n & FPS AI & 实际 EQ & 匹配静态 EQ \\
 \midrule
-枪声 & 72 & 10\% & 17\% & 100\% \\
-换弹 & 9 & 33\% & 11\% & 100\% \\
-烟雾弹/吃药/爆能器 & 6 & 83\% & 0\% & 100\% \\
-全部非脚步 & 87 & 17\% & 15\% & 100\% \\
+枪声 & 60 & \hlai{3\%} & 18\% & 100\% \\
+换弹 & 7 & 29\% & 14\% & 100\% \\
+烟雾弹/吃药/爆能器 & 2 & 0\% & 0\% & 100\% \\
+不含脚步的非脚步（合计） & 69 & \hlai{6\%} & 17\% & 100\% \\
 背景段* & 23 & 30\% & 0\% & 100\% \\
 \bottomrule\end{tabular}
-\begin{tablenotes}\footnotesize\item * 背景段未经人工核实。\end{tablenotes}\end{threeparttable}}
+\begin{tablenotes}\footnotesize\item 只统计盲审确认不含脚步的非脚步事件；吃药声 1 例据品牌方说明属 FPS AI 的特化增强，不计入 FPS AI 的误增强。\item * 背景段未经人工核实。\item 加粗：FPS AI 在该项上优于 C3 实际 EQ。\end{tablenotes}\end{threeparttable}}
 \end{table}

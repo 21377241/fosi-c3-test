@@ -1,0 +1,12 @@
+\begin{table}[htbp]\centering
+\caption{按是否含脚步分类的事件中位增益（dB）}\label{tab:overlap}
+{\small\begin{threeparttable}
+\begin{tabular}{lcccccc}\toprule
+类别 & n & 原始电平中位 & FPS AI & 实际 EQ & 匹配静态 EQ & \makecell{FPS AI\\> 3 dB} \\
+\midrule
+脚步 & 170 & $-$49 dBFS & \hlai{$+$8.7} & $-$0.8 & $+$8.7 & \hlai{94\%} \\
+与脚步重叠的非脚步 & 18 & $-$41 dBFS & $+$4.8 & $-$1.6 & $+$8.8 & 56\% \\
+不含脚步的非脚步 & 69 & $-$33 dBFS & \hlai{$+$0.2} & $-$0.9 & $+$8.9 & \hlai{7\%} \\
+\bottomrule\end{tabular}
+\begin{tablenotes}\footnotesize\item 脚步为增强目标；与脚步重叠的非脚步随脚步一起被增强属于正常；不含脚步的非脚步不应被增强。\item 是否含脚步由只听原始轨的非脚步盲审判定；与脚步重叠的事件：枪声 12、换弹 2、烟雾弹/吃药/爆能器 4。\item 不含脚步的非脚步中 FPS AI > 3 dB 的 5 个含吃药声 1 例（特化增强），其余 4 个为误增强。\item 加粗：FPS AI 优于 C3 实际 EQ（脚步增强更多；不含脚步的非脚步更接近 0、超过 3 dB 的比例更低）。\end{tablenotes}\end{threeparttable}}
+\end{table}

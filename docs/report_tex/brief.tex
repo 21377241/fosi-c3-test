@@ -11,6 +11,7 @@
 \ctexset{section={format=\Large\heiti\raggedright},subsection={format=\large\heiti\raggedright},
          subsubsection={format=\normalsize\heiti\raggedright}}
 \newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcommand{\hlai}[1]{\textbf{#1}}
 \renewcommand{\arraystretch}{1.18}
 \setlist{nosep,leftmargin=2em}
 \renewcommand{\topfraction}{0.9}\renewcommand{\bottomfraction}{0.8}\renewcommand{\textfraction}{0.07}
@@ -25,7 +26,7 @@
 \IfFileExists{figures/#1.png}{\includegraphics[width=#2]{figures/#1.png}}{%
 \fbox{\parbox[c][4.2cm][c]{#2}{\centering\small\color{gray}图位：\texttt{\detokenize{#1}}\\[2pt]按《图表需求说明》制作后放入 figures 目录}}}}
 \caption{#3}\label{fig:#4}\end{figure}}
-\newcommand{\keybox}[1]{\par\noindent\fcolorbox{black!45}{black!4}{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule}{#1}}\par}
+\newcommand{\keybox}[1]{\par\noindent{\parbox{\linewidth}{#1}}\par}
 
 
 \renewcommand{\FloatBarrier}{}
@@ -82,7 +83,9 @@ C3 实际 EQ & \bigval{$-0.8$ dB} & \bigval{$-1.0$ dB} \\
 此时枪声也被同步提升约 $+8.8$ dB（见第~\ref{sec:core} 节）。
 
 \vspace{3mm}
-\greybox{\textbf{边界说明：}约 17\% 的非脚步瞬态声增益也超过 3 dB，主要是远处的安静枪声、换弹和部分道具声；本测试只验证声学处理效果，不直接证明定位能力提升。}
+\greybox{\textbf{边界说明：}不含脚步的非脚步声音中，约 6\% 被误增强超过 3 dB（安静的换弹声、远处枪声），低于实际 EQ 的 17\%\footnotemark；
+与脚步重叠的声音会随脚步一起被增强，属于正常；与响亮枪声重叠时枪声基本不受影响。本测试只验证声学处理效果，不直接证明定位能力提升。}
+\footnotetext{是否含脚步由只听原始轨的盲审判定。另有 1 例吃药声被增强，据品牌方说明为 FPS AI 的特化增强，不计为误增强。详见技术报告。}
 
 \clearpage
 \section{实验为什么公平}
@@ -161,22 +164,29 @@ FPS AI 下枪声仍比脚步少增强 $6.9$ dB，而匹配静态 EQ 下这一差
 \section{更多证据与已知边界}
 \subsection{不仅是音量：FPS AI 对枪声音色结构的改变也明显低于实际 EQ}
 \begin{center}
-{\fontsize{22}{26}\selectfont\heiti\color{ai}枪声频谱变化 $\approx$ 实际 EQ 的 1/6}\\[4pt]
-{\small 频谱总变化：FPS AI $1.3$ dB$^2$ vs 实际 EQ $8.1$ dB$^2$\\
-扣除整体音量、只看频谱形状：约 1/4（$1.1$ vs $4.5$ dB$^2$）}
+{\fontsize{22}{26}\selectfont\heiti\color{ai}枪声频谱变化 $\approx$ 实际 EQ 的 1/9}\\[4pt]
+{\small 频谱总变化：FPS AI $0.9$ dB$^2$ vs 实际 EQ $8.3$ dB$^2$\\
+扣除整体音量、只看频谱形状：约 1/6（$0.7$ vs $4.4$ dB$^2$）}
 \end{center}
 在含响亮枪声的片段中，整段最大音量中位只变化 $+0.1$ dB：最响的声音没有被一起推高。
 
 \figslot{figb_gain_bars}{0.92\linewidth}{各类声音在三种处理下的中位增益（浅蓝带为宣传的 3--9 dB）}{bars}
-FPS AI 主要增强脚步，对响亮枪声影响较小；道具类声音（烟雾弹、吃药、爆能器，仅 6 个）也会被增强。
+FPS AI 主要增强脚步，对响亮枪声影响较小；道具类声音（烟雾弹、吃药、爆能器）仅 6 个，且其中 4 个与脚步重叠，其较高的中位增益主要来自重叠的脚步，样本过少，不作结论。
 
 \subsection{已知边界}
 \greybox{\begin{itemize}
-\item 约 17\% 的非脚步瞬态声增益超过 3 dB，主要是远处的安静枪声、换弹和部分道具声，它们与脚步一样安静、短促；
+\item 不含脚步的非脚步声音中，约 6\% 被误增强超过 3 dB，为安静的换弹声和远处枪声，它们与脚步一样安静、短促；
+\item 脚步与安静的枪声、道具等声音重叠时，重叠的声音会随脚步一起被增强；与响亮枪声重叠时，枪声基本不受影响；
 \item 脚步附近的背景声会随脚步同步抬升；以脚步为主的安静片段，整段最大音量中位上升 $+10.9$ dB；
 \item 本测试只验证声学处理效果，不直接证明玩家定位能力提升；
 \item 结论限于 VALORANT 与 PUBG 两款目标游戏。
 \end{itemize}}
+
+\section{模型更新补充：环境音误增强（PUBG）}
+主报告之后，品牌方提供了更新模型。针对官方“优化背景声误增强”口径，在同源 PUBG 素材上对照新旧模型
+（仅 PUBG；安静帧口径，与技术报告前文「背景段误增强 30\%」不是同一指标）：
+底噪误增强率由 17\% 降至 0\%，中位增益由 $-0.1$ 降至 $-3.5$ dB；
+脚步中位由 $+11.8$ 变为 $+12.3$ dB，未见明显削弱。详见技术报告「模型更新：环境音误增强改善」一节及独立短报告。
 
 \section{结论}
 \keybox{本次测试表明，在 VALORANT 与 PUBG 两款目标游戏中，C3 实际 EQ 未增强脚步，而 C3 FPS AI 表现出明显的脚步选择性增强：脚步获得显著增益，响亮枪声整体保持稳定；

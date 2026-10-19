@@ -1,4 +1,4 @@
-﻿"""External brief (Executive Report, LaTeX): readable in 1-3 minutes by an ordinary player.
+"""External brief (Executive Report, LaTeX): readable in 1-3 minutes by an ordinary player.
 
 Every number and wording here must already appear in the detailed Technical Report (report_tex.py); the brief only
 compresses it. Method details (labelling model, AUC / kappa, SEI, PANNs) stay in the detailed report.
@@ -68,7 +68,7 @@ def main():
     fo_h, nt_h, med, gap, mse = c["fo_h"], c["nt_h"], c["med"], c["gap"], c["mse"]
     gun = d[d.group == NT[0]]
     n_lab = c["n_r1"] + len(c["r2"]) + len(c["r3"]) + len(c["r4"])
-    fer = lambda x, k: (x[f"G_{k}"] > FER_THR).mean()
+    fer = lambda x, k: rf.fer_rate(x, k)
 
     core = {k: (med(fo_h, k), med(gun, k)) for k in ("EQ", "AI", "EQm")}
     fig_compare([("原始 → C3 实际 EQ", core["EQ"], C_EQ), ("原始 → C3 FPS AI", core["AI"], C_AI)], "figb_core_compare")
@@ -84,13 +84,16 @@ def main():
     pd.DataFrame(rows_g).to_csv(os.path.join(DATA, "figb_gain_bars.csv"), index=False, encoding="utf-8-sig")
 
     sub = lambda g, grp: d[(d.game == g) & (d.group == grp)]
-    tex_table("b_game", [{"游戏": nm, "脚步事件数": len(sub(g, FOOT)), "脚步 EQ": sgn(sub(g, FOOT).G_EQ.median()),
-                          "脚步 AI": sgn(sub(g, FOOT).G_AI.median()), "枪声事件数": len(sub(g, NT[0])),
-                          "枪声 EQ": sgn(sub(g, NT[0]).G_EQ.median()), "枪声 AI": sgn(sub(g, NT[0]).G_AI.median())}
+    mg = lambda g, grp, k: sub(g, grp)[f"G_{k}"].median()
+    tex_table("b_game", [{"游戏": nm, "脚步事件数": len(sub(g, FOOT)), "脚步 EQ": sgn(mg(g, FOOT, "EQ")),
+                          "脚步 AI": rt.mark(sgn(mg(g, FOOT, "AI")), mg(g, FOOT, "AI"), mg(g, FOOT, "EQ"), "up"),
+                          "枪声事件数": len(sub(g, NT[0])), "枪声 EQ": sgn(mg(g, NT[0], "EQ")),
+                          "枪声 AI": rt.mark(sgn(mg(g, NT[0], "AI")), mg(g, NT[0], "AI"), mg(g, NT[0], "EQ"), "zero")}
                          for g, nm in [("valorant", "VALORANT"), ("pubg", "PUBG")]],
               "两款目标游戏中的中位增益（dB，人工确认事件）", spec="lcccccc",
               heads=["游戏", r"\makecell{脚步\\事件数}", r"\makecell{脚步\\实际 EQ}", r"\makecell{\textbf{脚步}\\\textbf{FPS AI}}",
-                     r"\makecell{枪声\\事件数}", r"\makecell{枪声\\实际 EQ}", r"\makecell{\textbf{枪声}\\\textbf{FPS AI}}"])
+                     r"\makecell{枪声\\事件数}", r"\makecell{枪声\\实际 EQ}", r"\makecell{\textbf{枪声}\\\textbf{FPS AI}}"],
+              notes=["加粗：FPS AI 优于同游戏的 C3 实际 EQ（脚步增益更高，枪声更接近 0）。"])
 
     L = paper.loudness_stats()
     lp = L.pivot_table(index=["game", "clip_id"], columns="track", values="lmax")
@@ -119,10 +122,12 @@ def main():
         mse_frac=f"{mse(NT[0], 'MSE_EQ') / mse(NT[0], 'MSE_AI'):.0f}",
         mse_gs_ai=n(mse(NT[0], "MSEshape_AI"), sign=False), mse_gs_eq=n(mse(NT[0], "MSEshape_EQ"), sign=False),
         mse_sfrac=f"{mse(NT[0], 'MSEshape_EQ') / mse(NT[0], 'MSEshape_AI'):.0f}",
-        fer_ai=p(fer(nt_h, "AI")), loud_ai=n(d_loud), quiet_ai=n(d_quiet),
+        fer_ai=p(fer(nt_h, "AI")), fer_eq=p(fer(nt_h, "EQ")), loud_ai=n(d_loud), quiet_ai=n(d_quiet),
         g_ex_f=n(ex_gains[ex_f][0]), amp_ex_f=f"{10 ** (ex_gains[ex_f][0] / 20):.1f}", g_ex_g=n(ex_gains[ex_g][0]),
-        ex_f=str(ex_f), ex_g=str(ex_g), n_ut=str(int((d.group == NT[2]).sum())),
+        ex_f=str(ex_f), ex_g=str(ex_g), n_ut=str(int((d.group == NT[2]).sum())), n_ut_ov=str(int(c["ov"].group.eq(NT[2]).sum())),
+        n_special=str(int(((c["nt_clean"].G_AI > FER_THR) & c["nt_clean"].special).sum())),
     )
+    V.update(rt.prepare_pubg_nm_chapter())
     body = TEMPLATE.replace("→", r"$\rightarrow$")
     for k, val in V.items():
         body = body.replace(f"[[{k}]]", val)
@@ -198,7 +203,9 @@ C3 实际 EQ & \bigval{[[g_fo_eq]] dB} & \bigval{[[g_gun_eq]] dB} \\
 此时枪声也被同步提升约 [[g_gun_eqm]] dB（见第~\ref{sec:core} 节）。
 
 \vspace{3mm}
-\greybox{\textbf{边界说明：}约 [[fer_ai]] 的非脚步瞬态声增益也超过 3 dB，主要是远处的安静枪声、换弹和部分道具声；本测试只验证声学处理效果，不直接证明定位能力提升。}
+\greybox{\textbf{边界说明：}不含脚步的非脚步声音中，约 [[fer_ai]] 被误增强超过 3 dB（安静的换弹声、远处枪声），低于实际 EQ 的 [[fer_eq]]\footnotemark；
+与脚步重叠的声音会随脚步一起被增强，属于正常；与响亮枪声重叠时枪声基本不受影响。本测试只验证声学处理效果，不直接证明定位能力提升。}
+\footnotetext{是否含脚步由只听原始轨的盲审判定。另有 [[n_special]] 例吃药声被增强，据品牌方说明为 FPS AI 的特化增强，不计为误增强。详见技术报告。}
 
 \clearpage
 \section{实验为什么公平}
@@ -284,15 +291,22 @@ FPS AI 下枪声仍比脚步少增强 [[gap_gun]] dB，而匹配静态 EQ 下这
 在含响亮枪声的片段中，整段最大音量中位只变化 [[loud_ai]] dB：最响的声音没有被一起推高。
 
 \figslot{figb_gain_bars}{0.92\linewidth}{各类声音在三种处理下的中位增益（浅蓝带为宣传的 3--9 dB）}{bars}
-FPS AI 主要增强脚步，对响亮枪声影响较小；道具类声音（烟雾弹、吃药、爆能器，仅 [[n_ut]] 个）也会被增强。
+FPS AI 主要增强脚步，对响亮枪声影响较小；道具类声音（烟雾弹、吃药、爆能器）仅 [[n_ut]] 个，且其中 [[n_ut_ov]] 个与脚步重叠，其较高的中位增益主要来自重叠的脚步，样本过少，不作结论。
 
 \subsection{已知边界}
 \greybox{\begin{itemize}
-\item 约 [[fer_ai]] 的非脚步瞬态声增益超过 3 dB，主要是远处的安静枪声、换弹和部分道具声，它们与脚步一样安静、短促；
+\item 不含脚步的非脚步声音中，约 [[fer_ai]] 被误增强超过 3 dB，为安静的换弹声和远处枪声，它们与脚步一样安静、短促；
+\item 脚步与安静的枪声、道具等声音重叠时，重叠的声音会随脚步一起被增强；与响亮枪声重叠时，枪声基本不受影响；
 \item 脚步附近的背景声会随脚步同步抬升；以脚步为主的安静片段，整段最大音量中位上升 [[quiet_ai]] dB；
 \item 本测试只验证声学处理效果，不直接证明玩家定位能力提升；
 \item 结论限于 VALORANT 与 PUBG 两款目标游戏。
 \end{itemize}}
+
+\section{模型更新补充：环境音误增强（PUBG）}
+主报告之后，品牌方提供了更新模型。针对官方“优化背景声误增强”口径，在同源 PUBG 素材上对照新旧模型
+（仅 PUBG；安静帧口径，与技术报告前文「背景段误增强 30\%」不是同一指标）：
+底噪误增强率由 [[nm_rate_o]] 降至 [[nm_rate_n]]，中位增益由 [[nm_med_o]] 降至 [[nm_med_n]] dB；
+脚步中位由 [[nm_fo_o]] 变为 [[nm_fo_n]] dB，未见明显削弱。详见技术报告「模型更新：环境音误增强改善」一节及独立短报告。
 
 \section{结论}
 \keybox{本次测试表明，在 VALORANT 与 PUBG 两款目标游戏中，C3 实际 EQ 未增强脚步，而 C3 FPS AI 表现出明显的脚步选择性增强：脚步获得显著增益，响亮枪声整体保持稳定；
