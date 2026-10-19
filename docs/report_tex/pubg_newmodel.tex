@@ -26,7 +26,7 @@
 \IfFileExists{figures/#1.png}{\includegraphics[width=#2]{figures/#1.png}}{%
 \fbox{\parbox[c][4.2cm][c]{#2}{\centering\small\color{gray}图位：\texttt{\detokenize{#1}}\\[2pt]按《图表需求说明》制作后放入 figures 目录}}}}
 \caption{#3}\label{fig:#4}\end{figure}}
-\newcommand{\keybox}[1]{\par\noindent\fcolorbox{black!45}{black!4}{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule}{#1}}\par}
+\newcommand{\keybox}[1]{\par\noindent{\parbox{\linewidth}{#1}}\par}
 
 
 \definecolor{ai}{HTML}{1F4E79}
@@ -47,9 +47,10 @@
 范围： & PUBG 15 段；背景空隙 6 段\\
 对照： & 旧 FPS AI vs 新模型（同源原始轨）\\
 版本： & v2.0\quad 2026 年 10 月\\
+代码仓库： & \url{https://github.com/21377241/fosi-c3-test}\\
 \end{tabular}
 \vfill
-{\small 独立补充；不改动主报告结论。\par}
+{\small 独立补充；不改动主报告结论。分析代码见上述仓库。\par}
 \end{titlepage}
 
 \section{结论}

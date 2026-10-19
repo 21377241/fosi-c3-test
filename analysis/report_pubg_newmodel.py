@@ -346,9 +346,10 @@ TEMPLATE = PREAMBLE + r"""
 范围： & PUBG 15 段；背景空隙 [[n_bg]] 段\\
 对照： & 旧 FPS AI vs 新模型（同源原始轨）\\
 版本： & v2.0\quad 2026 年 10 月\\
+代码仓库： & \url{https://github.com/21377241/fosi-c3-test}\\
 \end{tabular}
 \vfill
-{\small 独立补充；不改动主报告结论。\par}
+{\small 独立补充；不改动主报告结论。分析代码见上述仓库。\par}
 \end{titlepage}
 
 \section{结论}
@@ -457,6 +458,7 @@ def build_html(vb, s, bf, other_verdict, other_detail, fig_ex=None, fig_claim=No
 <nav class="cta">
   <a href="{PDF_NAME}">PDF 完整报告</a>
   <a href="{LISTEN_NAME}">独立试听台</a>
+  <a class="ghost" href="https://github.com/21377241/fosi-c3-test">GitHub</a>
   <a class="ghost" href="#audio">本页对比音频</a>
 </nav>"""
 
@@ -508,6 +510,7 @@ def build_html(vb, s, bf, other_verdict, other_detail, fig_ex=None, fig_claim=No
 <section class="block files">
   <h2><span class="n">05</span> 相关文件</h2>
   <ul>
+    <li><a href="https://github.com/21377241/fosi-c3-test">GitHub 仓库</a></li>
     <li><a href="{PDF_NAME}">PDF 报告</a></li>
     <li><a href="{LISTEN_NAME}">背景误增强试听</a></li>
     <li>新模型：<code>fps_test/pubg/pubg_output_newmodel/</code></li>

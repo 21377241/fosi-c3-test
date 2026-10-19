@@ -23,6 +23,7 @@ OUTDIR = os.path.join(DOCS, "report_tex")
 TAB, FIG = os.path.join(OUTDIR, "tables"), os.path.join(OUTDIR, "figures")
 DATA = os.path.join(FIG, "data")
 PDF_OUT = os.path.join(DOCS, "C3 FPS AI 声卡客观评测 技术报告（详细版）.pdf")
+REPO_URL = "https://github.com/21377241/fosi-c3-test"
 rng = np.random.default_rng(2026)
 
 SYM = [("≥", r"$\geq$"), ("≤", r"$\leq$"), ("±", r"$\pm$"), ("×", r"$\times$"), ("→", r"$\rightarrow$"),
@@ -1037,10 +1038,11 @@ TEMPLATE = r"""\documentclass[11pt,a4paper]{ctexart}
 数据： & VALORANT [[n_vl]] 段、PUBG [[n_pg]] 段实录，共 [[dur]] min\\
 编制： & [编制部门 / 人员]\\
 版本： & v1.0\quad 2026 年 10 月\\
+代码仓库： & \url{https://github.com/21377241/fosi-c3-test}\\
 \end{tabular}
 \vfill
 {\small 本报告为事实与口径母版，对外简版（Executive Report）中的数字与结论均以本报告为准。\\
-全部表格与数据由 \texttt{analysis/report\_tex.py} 从原始数据自动生成。\par}
+全部表格与数据由 \texttt{analysis/report\_tex.py} 从原始数据自动生成；分析代码与复现脚本见上述 GitHub 仓库。\par}
 \end{titlepage}
 
 \tableofcontents
@@ -1397,7 +1399,8 @@ H1 中脚步增强效果明确，但增益分布与 3--9 dB 区间仅部分重�
 事件 FER 由 [[nm_fer_o]] 变为 [[nm_fer_n]]、纯净枪声频谱 MSE 由 [[nm_mse_o]] 变为 [[nm_mse_n]] dB$^2$，属有限回退。
 \input{tables/nm_other}
 
-综合：在官方“少抬环境底噪”口径下，PUBG 安静帧证据\textbf{支持}新模型改善；主能力未见明显削弱。完整试听与独立短报告见项目 \texttt{docs/} 目录下的 PUBG 新旧模型对比 HTML / PDF。
+综合：在官方“少抬环境底噪”口径下，PUBG 安静帧证据\textbf{支持}新模型改善；主能力未见明显削弱。
+完整试听与独立短报告见仓库 \texttt{docs/} 下的 PUBG 新旧模型对比 HTML / PDF；代码：\url{https://github.com/21377241/fosi-c3-test}。
 
 \section{局限与后续工作}\label{sec:limit}
 \begin{itemize}
@@ -1430,7 +1433,8 @@ H1 中脚步增强效果明确，但增益分布与 3--9 dB 区间仅部分重�
 \input{tables/detect}
 
 \section{复现说明}
-脚本位于 \texttt{analysis/}，按以下顺序运行：
+代码与脚本托管于 GitHub：\url{https://github.com/21377241/fosi-c3-test}。
+脚本位于仓库 \texttt{analysis/}，按以下顺序运行：
 \begin{enumerate}
 \item \texttt{analyze.py}：事件检测与三轨增益计算；
 \item \texttt{embed.py}、\texttt{embed\_clap.py}：提取 AST / CLAP 嵌入；
@@ -1442,7 +1446,7 @@ H1 中脚步增强效果明确，但增益分布与 3--9 dB 区间仅部分重�
 \item \texttt{report\_tex.py}：生成本报告的全部表格、图表数据与草图并编译。
 \end{enumerate}
 图表数据位于 \texttt{docs/report\_tex/figures/data/}；三轨纯净事件库位于 \texttt{analysis/clean\_events/}（[[n_clean]] 个事件）；
-人工标注与标注工具位于 \texttt{analysis/labeling/}。
+人工标注与标注工具位于 \texttt{analysis/labeling/}。原始三轨音频按仓库约定不公开。
 
 \section{参考文献}
 \begin{enumerate}[label={[\arabic*]},leftmargin=2.2em]\small
